@@ -16,7 +16,7 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, RunEvent, WebviewUrl, Webv
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 use clipboard::{Clipboard, Snapshot};
-use config::Config;
+use config::{Config, Source};
 use history::History;
 
 const APP_DIR: &str = "linux-clipboard-manager";
@@ -145,9 +145,9 @@ pub fn settings_changed(app: &AppHandle) {
     tray::refresh(app);
 }
 
-pub fn record_text(app: &AppHandle, text: &str) -> Result<(), String> {
+pub fn record_text(app: &AppHandle, text: &str, source: &Source) -> Result<(), String> {
     let state = app.state::<AppState>();
-    if state.paused.load(Ordering::Relaxed) {
+    if state.paused.load(Ordering::Relaxed) || state.config().should_skip(source) {
         return Ok(());
     }
     state.history.add_text(text)?;
@@ -155,9 +155,9 @@ pub fn record_text(app: &AppHandle, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn record_image_encoded(app: &AppHandle, data: &[u8]) -> Result<(), String> {
+pub fn record_image_encoded(app: &AppHandle, data: &[u8], source: &Source) -> Result<(), String> {
     let state = app.state::<AppState>();
-    if state.paused.load(Ordering::Relaxed) {
+    if state.paused.load(Ordering::Relaxed) || state.config().should_skip(source) {
         return Ok(());
     }
     state.history.add_image_encoded(data)?;
@@ -337,6 +337,7 @@ pub fn run() {
 
             apply_autostart(&handle, state.config().autostart);
             sync_shortcut(&handle);
+            gnome::update_installed_extension();
             tray::build(&handle)?;
             start_dbus(handle.clone());
             // Always running; it checks the poll_fallback setting on every tick.

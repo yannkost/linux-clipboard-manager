@@ -275,6 +275,7 @@ pub fn check_shortcut(accel: String) -> Option<String> {
 #[derive(Serialize)]
 pub struct Status {
     helper_active: bool,
+    extension_installed: bool,
     prefers_dark: bool,
     paused: bool,
     version: &'static str,
@@ -284,6 +285,7 @@ pub struct Status {
 pub fn get_status(state: tauri::State<'_, AppState>) -> Status {
     Status {
         helper_active: state.clipboard.helper_active(),
+        extension_installed: gnome::extension_installed(),
         prefers_dark: gnome::prefers_dark(),
         paused: state.paused.load(Ordering::Relaxed),
         version: env!("CARGO_PKG_VERSION"),
@@ -320,9 +322,11 @@ pub fn finish_welcome(app: AppHandle, state: tauri::State<'_, AppState>, window:
     Ok(())
 }
 
+/// Install and enable the GNOME helper. Returns true if it is running now,
+/// false if it starts after the next login.
 #[tauri::command]
-pub fn enable_extension() -> Result<(), String> {
-    gnome::enable_extension()
+pub fn enable_extension() -> Result<bool, String> {
+    gnome::install_extension()
 }
 
 /// About page links: "website", "source" or "issues".

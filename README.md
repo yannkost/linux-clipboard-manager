@@ -86,12 +86,37 @@ The app owns `io.github.yannkost.ClipboardManager` on the session bus at
 | `AddImage(ay)` | | record a PNG image |
 | `Hotkey` | property `s` | configured shortcut |
 
-It calls the GNOME Shell helper extension at `org.gnome.Shell`
-`/io/github/yannkost/ClipboardManager/Shell`, interface
-`io.github.yannkost.ClipboardManager.Shell`: `SetText(s)`, `SetImage(ay)`,
-`Paste(b plain)`, `Version() → u`. When it is not there, the app polls the
-clipboard every 500 ms with arboard instead, and selecting an entry only puts
-it on the clipboard (you paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> yourself).
+The GNOME helper extension also calls `AddTextFrom(s text, s app_name, s app_id, b password)`
+and `AddImageFrom(ay image, s app_name, s app_id)`, so Clips can skip
+passwords and excluded apps.
+
+## GNOME helper extension
+
+`gnome-extension/clips-helper@yannkost.github.io` runs inside GNOME Shell,
+where Wayland allows what a normal app cannot:
+
+- reports every clipboard change to Clips (with the source app and the
+  `x-kde-passwordManagerHint` password marker), replacing the 500 ms polling;
+- exports `io.github.yannkost.ClipboardManager.Shell` on GNOME Shell's bus
+  connection (`/io/github/yannkost/ClipboardManager/Shell`): `SetText(s)`,
+  `SetImage(ay)`, `Paste(b plain)`, `Version() → u`. `Paste` refocuses the
+  window that was active before the popup and sends <kbd>Ctrl</kbd>+<kbd>V</kbd>
+  (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> in terminals) through a virtual keyboard.
+
+The extension is bundled in the Clips binary. *Install* in Settings → Shortcut
+(or *Enable extension* in the welcome dialog) copies it to
+`~/.local/share/gnome-shell/extensions/` and adds it to GNOME's enabled
+extensions; on Wayland it starts after you log out and back in. Clips keeps
+the installed copy up to date on startup. To install by hand:
+
+```bash
+cp -r gnome-extension/clips-helper@yannkost.github.io ~/.local/share/gnome-shell/extensions/
+gnome-extensions enable clips-helper@yannkost.github.io   # after logging out and in
+```
+
+Without the extension Clips falls back to polling the clipboard with arboard,
+and selecting an entry only puts it on the clipboard (you paste with
+<kbd>Ctrl</kbd>+<kbd>V</kbd> yourself).
 
 ## Credits
 

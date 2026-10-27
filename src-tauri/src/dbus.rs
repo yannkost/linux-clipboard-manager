@@ -8,6 +8,7 @@
 use tauri::{AppHandle, Manager};
 use zbus::{connection, fdo, interface, proxy, proxy::CacheProperties, Connection};
 
+use crate::config::Source;
 use crate::AppState;
 
 pub const BUS_NAME: &str = "io.github.yannkost.ClipboardManager";
@@ -24,19 +25,20 @@ impl Service {
     }
 
     async fn add_text(&self, text: String) -> fdo::Result<()> {
-        let app = self.app.clone();
-        tauri::async_runtime::spawn_blocking(move || crate::record_text(&app, &text))
-            .await
-            .map_err(|e| fdo::Error::Failed(e.to_string()))?
-            .map_err(fdo::Error::Failed)
+        self.record_text(text, Source::default()).await
     }
 
     async fn add_image(&self, png: Vec<u8>) -> fdo::Result<()> {
-        let app = self.app.clone();
-        tauri::async_runtime::spawn_blocking(move || crate::record_image_encoded(&app, &png))
-            .await
-            .map_err(|e| fdo::Error::Failed(e.to_string()))?
-            .map_err(fdo::Error::Failed)
+        self.record_image(png, Source::default()).await
+    }
+
+    /// Called by the GNOME helper for every clipboard change.
+    async fn add_text_from(&self, text: String, app_name: String, app_id: String, password: bool) -> fdo::Result<()> {
+        self.record_text(text, Source { app_name, app_id, password }).await
+    }
+
+    async fn add_image_from(&self, png: Vec<u8>, app_name: String, app_id: String) -> fdo::Result<()> {
+        self.record_image(png, Source { app_name, app_id, password: false }).await
     }
 
     /// The configured shortcut, for the helper extension to bind.
@@ -46,7 +48,25 @@ impl Service {
     }
 }
 
-/// The GNOME Shell helper extension (a separate project, step 3).
+impl Service {
+    async fn record_text(&self, text: String, source: Source) -> fdo::Result<()> {
+        let app = self.app.clone();
+        tauri::async_runtime::spawn_blocking(move || crate::record_text(&app, &text, &source))
+            .await
+            .map_err(|e| fdo::Error::Failed(e.to_string()))?
+            .map_err(fdo::Error::Failed)
+    }
+
+    async fn record_image(&self, png: Vec<u8>, source: Source) -> fdo::Result<()> {
+        let app = self.app.clone();
+        tauri::async_runtime::spawn_blocking(move || crate::record_image_encoded(&app, &png, &source))
+            .await
+            .map_err(|e| fdo::Error::Failed(e.to_string()))?
+            .map_err(fdo::Error::Failed)
+    }
+}
+
+/// The GNOME Shell helper extension (gnome-extension/ in this repository).
 #[proxy(
     interface = "io.github.yannkost.ClipboardManager.Shell",
     default_service = "org.gnome.Shell",

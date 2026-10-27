@@ -64,10 +64,19 @@ function row(label, control, cls = "") {
   return el("div", { class: `row ${cls}`.trim() }, typeof label === "string" ? el("span", {}, label) : label, control);
 }
 
-function extensionPill() {
-  return status.helper_active
-    ? el("span", { class: "pill ok" }, "Enabled ✓")
-    : el("span", { class: "pill warn" }, "Not enabled");
+function extensionControls() {
+  const wrap = el("div", { class: "shortcut-controls" }, extensionPill(status));
+  if (!status.helper_active && !status.extension_installed) {
+    wrap.append(el("button", { class: "btn", type: "button", onclick: async () => {
+      try {
+        status = await installExtension();
+      } catch (err) {
+        toast(root, String(err), 3000);
+      }
+      render();
+    } }, "Install"));
+  }
+  return wrap;
 }
 
 // ---- pages ----
@@ -111,7 +120,7 @@ function shortcutPage() {
       el("div", { class: "boxed" }, rows),
       shortcut.mode === "recording" && el("div", { class: "group-note" }, "Press Esc to cancel or Backspace to remove the shortcut.")),
     group("GNOME extension", [
-      row(el("div", {}, el("span", {}, "Clips extension"), el("span", { class: "sub" }, "Needed for auto-paste and reliable clipboard capture")), extensionPill(), "tall"),
+      row(el("div", {}, el("span", {}, "Clips extension"), el("span", { class: "sub" }, extensionHint(status))), extensionControls(), "tall"),
     ]),
   ];
 }
@@ -284,7 +293,7 @@ initTheme().then((r) => {
 // The extension can be enabled while the window is open.
 setInterval(async () => {
   const s = await invoke("get_status").catch(() => null);
-  if (s && s.helper_active !== status.helper_active) {
+  if (s && (s.helper_active !== status.helper_active || s.extension_installed !== status.extension_installed)) {
     status = s;
     if (shortcut.mode === "default" && !addingApp) render();
   }

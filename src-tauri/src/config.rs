@@ -36,6 +36,16 @@ pub struct Config {
     pub first_run_done: bool,
 }
 
+/// Where a clipboard change came from, as reported by the GNOME helper.
+#[derive(Debug, Clone, Default)]
+pub struct Source {
+    pub app_name: String,
+    /// Desktop file id, e.g. "signal-desktop.desktop".
+    pub app_id: String,
+    /// A password manager marked the content as secret.
+    pub password: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {
@@ -97,6 +107,18 @@ impl Config {
         Ok(())
     }
 
+    /// Whether a copy from `source` must not be recorded (password or excluded app).
+    pub fn should_skip(&self, source: &Source) -> bool {
+        if source.password && self.ignore_passwords {
+            return true;
+        }
+        let name = source.app_name.to_lowercase();
+        let id = source.app_id.to_lowercase();
+        self.excluded_apps.iter().map(|a| a.trim().to_lowercase()).filter(|a| !a.is_empty()).any(|a| {
+            name == a || id == a || id.trim_end_matches(".desktop") == a || id.contains(&a) || name.contains(&a)
+        })
+    }
+
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;
@@ -109,6 +131,18 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn skips_passwords_and_excluded_apps() {
+        let source = |name: &str, id: &str, password| Source { app_name: name.into(), app_id: id.into(), password };
+        let mut c = Config { excluded_apps: vec!["Signal".into()], ..Config::default() };
+        assert!(c.should_skip(&source("Signal", "signal-desktop.desktop", false)));
+        assert!(c.should_skip(&source("", "signal-desktop.desktop", false)));
+        assert!(!c.should_skip(&source("Firefox", "firefox.desktop", false)));
+        assert!(c.should_skip(&source("KeePassXC", "", true)));
+        c.ignore_passwords = false;
+        assert!(!c.should_skip(&source("KeePassXC", "", true)));
+    }
 
     #[test]
     fn creates_default_file_and_reads_partial_files() {

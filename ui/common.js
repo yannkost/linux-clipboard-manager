@@ -218,6 +218,27 @@ function keycaps(accel, conflict = false) {
   return wrap;
 }
 
+// ---- GNOME helper extension ----
+
+/** Status pill for the helper: running, installed (needs a re-login), or missing. */
+function extensionPill(status) {
+  if (status.helper_active) return el("span", { class: "pill ok" }, "Enabled ✓");
+  if (status.extension_installed) return el("span", { class: "pill warn" }, "Log out to finish");
+  return el("span", { class: "pill warn" }, "Not enabled");
+}
+
+function extensionHint(status) {
+  if (status.helper_active) return "Needed for auto-paste and reliable clipboard capture";
+  if (status.extension_installed) return "Installed. Log out and back in once to start it.";
+  return "Needed for auto-paste and reliable clipboard capture";
+}
+
+/** Install and enable the helper; resolves to the fresh status. */
+async function installExtension() {
+  await invoke("enable_extension");
+  return invoke("get_status");
+}
+
 function toast(container, text, ms = 1400) {
   let t = container.querySelector(":scope > .toast");
   if (!t) {

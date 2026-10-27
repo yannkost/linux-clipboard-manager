@@ -1,6 +1,7 @@
 //! GNOME desktop integration through `gsettings`: the custom keyboard
 //! shortcut that opens the popup, shortcut conflicts, and the colour scheme.
 
+use std::path::PathBuf;
 use std::process::Command;
 
 const MEDIA_KEYS: &str = "org.gnome.settings-daemon.plugins.media-keys";
@@ -158,17 +159,61 @@ pub fn prefers_dark() -> bool {
     gsettings(&["get", "org.gnome.desktop.interface", "color-scheme"]).is_ok_and(|v| v.contains("dark"))
 }
 
-/// Ask GNOME Shell to enable the helper extension.
-pub fn enable_extension() -> Result<(), String> {
-    let out = Command::new("gnome-extensions")
+const EXTENSION_FILES: [(&str, &str); 2] = [
+    ("metadata.json", include_str!("../../gnome-extension/clips-helper@yannkost.github.io/metadata.json")),
+    ("extension.js", include_str!("../../gnome-extension/clips-helper@yannkost.github.io/extension.js")),
+];
+
+fn extension_dir() -> Option<PathBuf> {
+    Some(dirs::data_dir()?.join("gnome-shell/extensions").join(EXTENSION_UUID))
+}
+
+pub fn extension_installed() -> bool {
+    extension_dir().is_some_and(|d| d.join("extension.js").exists())
+}
+
+/// Write the bundled extension into ~/.local/share/gnome-shell/extensions.
+/// Returns whether anything changed on disk.
+fn write_extension_files() -> Result<bool, String> {
+    let dir = extension_dir().ok_or("no data folder")?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut changed = false;
+    for (name, body) in EXTENSION_FILES {
+        let path = dir.join(name);
+        if std::fs::read_to_string(&path).ok().as_deref() != Some(body) {
+            std::fs::write(&path, body).map_err(|e| format!("{}: {e}", path.display()))?;
+            changed = true;
+        }
+    }
+    Ok(changed)
+}
+
+/// Keep an installed extension in step with this build of Clips. GNOME Shell
+/// loads the new code at the next login.
+pub fn update_installed_extension() {
+    if extension_installed() {
+        if let Err(e) = write_extension_files() {
+            eprintln!("extension: could not update: {e}");
+        }
+    }
+}
+
+/// Install the helper extension and mark it enabled. Returns true if GNOME
+/// Shell started it right away; on Wayland a newly installed extension only
+/// loads after logging out and back in.
+pub fn install_extension() -> Result<bool, String> {
+    write_extension_files()?;
+    let mut enabled = gsettings(&["get", "org.gnome.shell", "enabled-extensions"]).map(|v| parse_strings(&v))?;
+    if !enabled.iter().any(|u| u == EXTENSION_UUID) {
+        enabled.push(EXTENSION_UUID.to_string());
+        let list = format!("[{}]", enabled.iter().map(|u| quote(u)).collect::<Vec<_>>().join(", "));
+        gsettings(&["set", "org.gnome.shell", "enabled-extensions", &list])?;
+    }
+    let started = Command::new("gnome-extensions")
         .args(["enable", EXTENSION_UUID])
         .output()
-        .map_err(|e| format!("gnome-extensions: {e}"))?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err("The Clips GNOME extension is not installed yet.".into())
-    }
+        .is_ok_and(|o| o.status.success());
+    Ok(started)
 }
 
 #[cfg(test)]

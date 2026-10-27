@@ -11,10 +11,11 @@ function render() {
   $("shortcut-text").textContent = settings.hotkey
     ? `Press ${parts.join("+")} anywhere to open your history.`
     : "Set a shortcut in Settings to open your history.";
-  $("ext-status").replaceChildren(status.helper_active
-    ? el("span", { class: "pill ok" }, "Enabled ✓")
-    : el("span", { class: "pill warn" }, "Not enabled"));
-  $("ext-action").hidden = status.helper_active;
+  $("ext-status").replaceChildren(extensionPill(status));
+  $("ext-action").hidden = status.helper_active || status.extension_installed;
+  $("ext-text").textContent = status.extension_installed && !status.helper_active
+    ? "Installed. Log out and back in once to start it; until then Clips works without auto-paste."
+    : "A small GNOME extension needs to be enabled for auto-paste and reliable clipboard capture to work.";
   $("login").replaceChildren(el("button", {
     class: "switch", type: "button", role: "switch", "aria-label": "Launch at login",
     "aria-checked": settings.autostart ? "true" : "false",
@@ -31,9 +32,8 @@ function render() {
 
 $("enable-ext").addEventListener("click", async () => {
   try {
-    await invoke("enable_extension");
+    status = await installExtension();
     $("ext-error").hidden = true;
-    status = await invoke("get_status");
   } catch (err) {
     $("ext-error").textContent = String(err);
     $("ext-error").hidden = false;
@@ -54,5 +54,5 @@ initTheme().then((r) => {
 });
 setInterval(async () => {
   const s = await invoke("get_status").catch(() => null);
-  if (s && s.helper_active !== status.helper_active) { status = s; render(); }
+  if (s && (s.helper_active !== status.helper_active || s.extension_installed !== status.extension_installed)) { status = s; render(); }
 }, 3000);
