@@ -106,12 +106,13 @@ function renderRow(entry, index) {
   row.addEventListener("click", (e) => {
     if (e.ctrlKey || e.metaKey) {
       toggleMulti(entry.id);
+      search.focus();
     } else {
+      // One click uses the entry: copy it (and paste if enabled), close the popup.
       state.multi.clear();
       state.sel = index;
-      render();
+      paste(e.shiftKey);
     }
-    search.focus();
   });
   return row;
 }
@@ -143,15 +144,7 @@ function render() {
 
   $("recent-count").textContent = state.counts.recent;
   $("pinned-count").textContent = state.counts.pinned;
-  // Delegated: a click re-renders the rows, so the second click lands on a new node.
-list.addEventListener("dblclick", (e) => {
-  const row = e.target.closest(".row");
-  if (!row || e.ctrlKey || e.metaKey || e.target.closest(".open-btn")) return;
-  state.sel = Number(row.dataset.index);
-  paste(false);
-});
-
-for (const t of document.querySelectorAll("[data-tab]")) {
+  for (const t of document.querySelectorAll("[data-tab]")) {
     const on = t.dataset.tab === state.tab;
     t.classList.toggle("on", on);
     t.setAttribute("aria-selected", on);

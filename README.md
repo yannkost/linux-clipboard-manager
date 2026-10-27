@@ -60,7 +60,7 @@ which also warns when GNOME already uses the combination.
 |---|---|
 | type | filter |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd> | move |
-| <kbd>Enter</kbd> / double-click | paste |
+| <kbd>Enter</kbd> / click | paste (<kbd>Shift</kbd>+click: as plain text) |
 | <kbd>Shift</kbd>+<kbd>Enter</kbd> | paste as plain text |
 | <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | paste that row of the open tab |
 | <kbd>Tab</kbd> | switch Recent / Pinned |
