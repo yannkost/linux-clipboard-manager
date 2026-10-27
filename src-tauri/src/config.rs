@@ -19,6 +19,21 @@ pub struct Config {
     pub autostart: bool,
     /// Poll the clipboard when the GNOME Shell helper extension is missing.
     pub poll_fallback: bool,
+    pub show_tray: bool,
+    /// "system", "light" or "dark".
+    pub theme: String,
+    /// Unpinned entries not used for this many days are deleted (0 = forever).
+    pub retention_days: u32,
+    /// Skip copies marked as passwords (needs the GNOME helper extension).
+    pub ignore_passwords: bool,
+    /// Apps whose copies are not saved (needs the GNOME helper extension).
+    pub excluded_apps: Vec<String>,
+    /// Bump a pasted entry to the top of Recent.
+    pub move_to_top: bool,
+    /// Enter pastes as plain text and Shift+Enter keeps formatting.
+    pub strip_formatting: bool,
+    /// The welcome dialog has been shown.
+    pub first_run_done: bool,
 }
 
 impl Default for Config {
@@ -30,6 +45,14 @@ impl Default for Config {
             paste_after_select: false,
             autostart: true,
             poll_fallback: true,
+            show_tray: true,
+            theme: "system".into(),
+            retention_days: 0,
+            ignore_passwords: true,
+            excluded_apps: Vec::new(),
+            move_to_top: true,
+            strip_formatting: false,
+            first_run_done: false,
         }
     }
 }
@@ -65,8 +88,11 @@ impl Config {
         if self.max_image_bytes < 1024 * 1024 {
             return Err("Maximum image size must be at least 1 MB.".into());
         }
-        if self.hotkey.trim().is_empty() {
-            return Err("The shortcut cannot be empty.".into());
+        if !matches!(self.theme.as_str(), "system" | "light" | "dark") {
+            return Err("Theme must be system, light or dark.".into());
+        }
+        if !matches!(self.retention_days, 0 | 1 | 7 | 30) {
+            return Err("Keep history for must be forever, 1, 7 or 30 days.".into());
         }
         Ok(())
     }

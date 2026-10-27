@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to Clips</title>
+  <link rel="stylesheet" href="tokens.css">
+  <style>
+    .welcome {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 28px 28px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .welcome-head { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-bottom: 6px; }
+    .welcome-title { font-size: 20px; line-height: 26px; font-weight: 700; }
+    .card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: 0 0 0 1px var(--border); padding: 14px; }
+    .shortcut-card { display: flex; align-items: center; gap: 14px; }
+    .ext-card { display: flex; flex-direction: column; gap: 12px; }
+    .ext-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .ext-name { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+    .ext-name .icon { font-size: 20px; color: var(--text-muted); }
+    .ext-text { font-size: 13px; line-height: 19px; color: var(--text-muted); }
+    .ext-error { font-size: 12px; line-height: 16px; color: var(--warning); }
+    .login-card { min-height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+    .spacer { flex: 1; }
+    .start {
+      height: 40px;
+      border: none;
+      border-radius: 20px;
+      background: var(--accent);
+      color: var(--on-accent);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .start:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div class="window welcome" id="welcome" data-tauri-drag-region>
+    <div class="welcome-head" data-tauri-drag-region>
+      <div id="icon"></div>
+      <div class="welcome-title">Welcome to Clips</div>
+    </div>
+    <div class="card shortcut-card">
+      <div id="keys"></div>
+      <span id="shortcut-text"></span>
+    </div>
+    <div class="card ext-card">
+      <div class="ext-head">
+        <div class="ext-name"><span data-icon="extension"></span>GNOME extension</div>
+        <span id="ext-status"></span>
+      </div>
+      <div class="ext-text">A small GNOME extension needs to be enabled for auto-paste and reliable clipboard capture to work.</div>
+      <div id="ext-action"><button class="btn" id="enable-ext" type="button" style="font-weight:600">Enable extension</button></div>
+      <div class="ext-error" id="ext-error" hidden></div>
+    </div>
+    <div class="card login-card">
+      <span>Launch at login</span>
+      <span id="login"></span>
+    </div>
+    <div class="spacer" data-tauri-drag-region></div>
+    <button class="start" id="start" type="button">Get started</button>
+  </div>
+  <script src="common.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

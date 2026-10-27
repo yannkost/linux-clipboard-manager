@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clips Settings</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="window settings" id="settings">
+    <nav class="sidebar">
+      <div class="bar-title" data-tauri-drag-region>Settings</div>
+      <div class="pages" id="pages" role="tablist" aria-orientation="vertical"></div>
+    </nav>
+    <main class="page">
+      <div class="bar-title" data-tauri-drag-region>
+        <span id="page-title" data-tauri-drag-region></span>
+        <button class="window-close" id="close" type="button" title="Close"><span data-icon="close"></span></button>
+      </div>
+      <div class="page-body" id="body"></div>
+    </main>
+    <div class="scrim" id="dialog" hidden>
+      <div class="dialog" role="alertdialog" aria-labelledby="dialog-title" aria-describedby="dialog-text">
+        <div class="dialog-title" id="dialog-title">Clear history?</div>
+        <div class="dialog-text" id="dialog-text">Every item in your clipboard history will be deleted, except pinned items. This can’t be undone.</div>
+        <div class="dialog-buttons">
+          <button class="btn" id="dialog-cancel" type="button">Cancel</button>
+          <button class="btn danger" id="dialog-confirm" type="button">Clear history</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="common.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

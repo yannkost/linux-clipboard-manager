@@ -1,0 +1,319 @@
+/* Clips design tokens and shared components (from the "Clips Desktop" design). */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  src: url("fonts/inter-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  src: url("fonts/jetbrains-mono-latin.woff2") format("woff2");
+}
+/* Subset of Material Symbols Rounded; icons are referenced by codepoint (see common.js). */
+@font-face {
+  font-family: "Material Symbols Rounded";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url("fonts/material-symbols-rounded.woff2") format("woff2");
+}
+
+:root,
+:root[data-theme="light"] {
+  --bg: #fafafb;
+  --surface: #ffffff;
+  --surface-hover: #f1f1f4;
+  --selected: #dbe9fa;
+  --selected-multi: #edf3fc;
+  --border: #e1e1e6;
+  --separator: #efeff2;
+  --text: #1f1f24;
+  --text-muted: #6a6a73;
+  --accent: #3584e4;
+  --accent-text: #1c71d8;
+  --on-accent: #ffffff;
+  --danger: #e01b24;
+  --danger-text: #c01c28;
+  --warning: #8a5d00;
+  --warning-bg: #fdf1cf;
+  --success: #1b7f4d;
+  --success-bg: #ddf3e6;
+  --icon-bg: #eeeef1;
+  --kbd-bg: #f4f4f6;
+  --sidebar: #ebebed;
+  --sidebar-sel: #dadade;
+  --switch-off: #d6d6da;
+  --toggle-on: #ffffff;
+  --scrim: rgba(0, 0, 6, 0.25);
+  --ph1: #e6e6ea;
+  --ph2: #dcdce1;
+  /* Tighter than the mock-up's shadow so it fits in the window's transparent margin. */
+  --shadow: 0 0 0 1px rgba(0, 0, 6, 0.08), 0 14px 36px -10px rgba(0, 0, 6, 0.3);
+  --menu-shadow: 0 0 0 1px rgba(0, 0, 6, 0.08), 0 8px 24px -6px rgba(0, 0, 6, 0.25);
+  --scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #222226;
+  --surface: #2e2e33;
+  --surface-hover: #38383e;
+  --selected: #2a3f5e;
+  --selected-multi: #33394a;
+  --border: #3c3c42;
+  --separator: #35353a;
+  --text: #ededf0;
+  --text-muted: #a8a8b0;
+  --accent: #3584e4;
+  --accent-text: #78aeed;
+  --on-accent: #ffffff;
+  --danger: #c01c28;
+  --danger-text: #ff7b63;
+  --warning: #e9c46a;
+  --warning-bg: #3b331b;
+  --success: #6bd49a;
+  --success-bg: #1e3a2b;
+  --icon-bg: #38383e;
+  --kbd-bg: #38383e;
+  --sidebar: #2a2a2f;
+  --sidebar-sel: #3d3d43;
+  --switch-off: #4a4a50;
+  --toggle-on: #55555c;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --ph1: #2a2a2f;
+  --ph2: #323238;
+  --shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 14px 36px -10px rgba(0, 0, 0, 0.65);
+  --menu-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+  --scheme: dark;
+}
+
+:root {
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 24px;
+  --space-8: 32px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Each window is transparent; .window is the visible card. The padding is the
+   room its shadow needs to fade out: keep it in sync with SHADOW_MARGIN_* in lib.rs. */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background: transparent; }
+body {
+  padding: 20px 32px 48px;
+  font: 14px/20px Inter, system-ui, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+/* color-scheme lives on the card, not :root: on the root it would make the
+   browser paint the whole (transparent) window dark. */
+.window {
+  color-scheme: var(--scheme);
+  position: relative;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+input, select, button { font: inherit; color: inherit; }
+input:focus { outline: none; }
+input::placeholder { color: var(--text-muted); }
+[hidden] { display: none !important; }
+
+.icon {
+  font-family: "Material Symbols Rounded";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.icon.filled { font-variation-settings: "FILL" 1; }
+
+/* Flat buttons */
+.btn {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--icon-bg);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn .icon { font-size: 16px; }
+.btn:hover { filter: brightness(0.96); }
+:root[data-theme="dark"] .btn:hover { filter: brightness(1.15); }
+.btn.primary { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.danger { background: var(--danger); color: #ffffff; font-weight: 600; }
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.icon-btn .icon { font-size: 18px; }
+.round-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 15px;
+  background: var(--icon-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Segmented toggle (tabs, theme, keep history) */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--icon-bg);
+}
+.segmented > * {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+}
+.segmented > .on {
+  background: var(--toggle-on);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  color: var(--text);
+}
+
+/* Switch */
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: var(--switch-off);
+  transition: background 0.15s;
+  border: none;
+  padding: 0;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: left 0.15s;
+}
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { left: 22px; }
+.switch:focus-visible, .btn:focus-visible, .segmented > *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Keycaps */
+.keys { display: flex; align-items: center; gap: 4px; }
+.keys .plus { font-size: 12px; color: var(--text-muted); }
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--kbd-bg);
+  box-shadow: inset 0 0 0 1px var(--border), 0 1px 0 var(--border);
+  font: 500 12px var(--mono);
+}
+.keys.conflict .kbd { background: var(--warning-bg); box-shadow: inset 0 0 0 1px var(--warning); color: var(--warning); }
+
+/* Boxed lists (settings groups) */
+.group { display: flex; flex-direction: column; gap: 8px; }
+.group-title { font-size: 14px; font-weight: 600; padding: 0 2px; }
+.boxed {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+.boxed > .row {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 14px;
+}
+.boxed > .row > :first-child { min-width: 0; }
+.boxed > .row > :last-child { flex-shrink: 0; }
+.boxed > .row + .row { border-top: 1px solid var(--border); }
+.row .sub { display: block; font-size: 12px; line-height: 16px; color: var(--text-muted); }
+
+/* Status pills */
+.pill {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill.ok { background: var(--success-bg); color: var(--success); }
+.pill.warn { background: var(--warning-bg); color: var(--warning); }
+.pill.warn::before { content: ""; width: 6px; height: 6px; border-radius: 3px; background: var(--warning); }
+
+/* Toast */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: rgba(30, 30, 34, 0.94);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 20;
+  pointer-events: none;
+}

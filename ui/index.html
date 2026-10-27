@@ -3,64 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clipboard</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Clips</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-<div id="card">
-  <header>
-    <input id="search" type="search" placeholder="Search clipboard history…" autocomplete="off" spellcheck="false">
-    <button id="open-settings" type="button" title="Settings (Ctrl+,)" aria-label="Settings">⚙</button>
-  </header>
-  <main id="history-view">
-    <ul id="list" role="listbox" aria-label="Clipboard history"></ul>
-    <p id="empty" hidden>Nothing here yet. Copy something!</p>
-  </main>
-  <form id="settings-view" hidden>
-    <h2>Settings</h2>
-    <label class="check">
-      <input type="checkbox" name="paste_after_select">
-      <span>Paste automatically after selecting an entry
-        <small>Needs the GNOME helper extension (not available yet). When off, the entry is only copied and you press Ctrl+V yourself.</small>
-      </span>
-    </label>
-    <label class="field">
-      <span>Maximum entries to keep <small>Pinned entries don't count.</small></span>
-      <input type="number" name="max_items" min="1" max="100000" step="1" required>
-    </label>
-    <label class="field">
-      <span>Maximum image size (MB) <small>Larger images are not saved.</small></span>
-      <input type="number" name="max_image_mb" min="1" max="1024" step="1" required>
-    </label>
-    <label class="check">
-      <input type="checkbox" name="autostart">
-      <span>Start at login</span>
-    </label>
-    <label class="check">
-      <input type="checkbox" name="poll_fallback">
-      <span>Record the clipboard by polling
-        <small>Used while the GNOME helper extension is not installed.</small>
-      </span>
-    </label>
-    <label class="field">
-      <span>Shortcut <small>Used by the GNOME helper extension. Until then, set it under Settings → Keyboard → Custom Shortcuts.</small></span>
-      <input type="text" name="hotkey" required spellcheck="false">
-    </label>
-    <p id="settings-error" role="alert" hidden></p>
-    <div class="buttons">
-      <button type="button" id="cancel-settings">Cancel</button>
-      <button type="submit" class="primary">Save</button>
+  <div class="window popup" id="popup">
+    <div class="list-col">
+      <header class="search-bar">
+        <span data-icon="search" class="search-icon"></span>
+        <input id="search" type="text" placeholder="Search clipboard…" autocomplete="off" spellcheck="false" aria-label="Search clipboard">
+        <button id="filter-chip" class="chip" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span id="filter-label">All</span><span data-icon="expand_more"></span>
+        </button>
+      </header>
+      <div class="tabs-bar">
+        <div class="segmented" role="tablist">
+          <button type="button" role="tab" data-tab="recent" class="on">Recent <span class="count" id="recent-count">0</span></button>
+          <button type="button" role="tab" data-tab="pinned">Pinned <span class="count" id="pinned-count">0</span></button>
+        </div>
+      </div>
+      <div class="list-scroll" id="scroll">
+        <div id="list" role="listbox" aria-label="Clipboard history" aria-multiselectable="true"></div>
+        <div class="empty" id="empty" hidden>
+          <div class="empty-icon"><span data-icon="content_paste"></span></div>
+          <div class="empty-text">Nothing copied yet. Copy something and it will show up here.</div>
+        </div>
+        <div class="empty no-results" id="no-results" hidden>
+          <div class="empty-icon"><span data-icon="search_off"></span></div>
+          <div class="empty-title">No results for “<span id="no-results-query"></span>”</div>
+          <div class="empty-hint">Try a different search, or set the filter to All.</div>
+        </div>
+      </div>
+      <footer class="hints">
+        <div class="hint-text" id="hints"></div>
+        <span class="hint-count" id="count-label">0 items</span>
+      </footer>
     </div>
-  </form>
-  <footer id="history-footer">
-    <span><kbd>Enter</kbd> paste</span>
-    <span><kbd>Shift+Enter</kbd> plain</span>
-    <span><kbd>Ctrl+P</kbd> pin</span>
-    <span><kbd>Del</kbd> delete</span>
-    <span><kbd>Esc</kbd> close</span>
-    <span><kbd>Ctrl+,</kbd> settings</span>
-  </footer>
-</div>
-  <script src="app.js"></script>
+
+    <aside class="preview" id="preview" hidden>
+      <div class="preview-head">
+        <div class="preview-titles">
+          <span class="preview-title" id="pv-title"></span>
+          <span class="preview-sub" id="pv-sub"></span>
+        </div>
+        <button class="close-btn" id="pv-close" type="button" title="Close preview (←)"><span data-icon="close"></span></button>
+      </div>
+      <div class="preview-text" id="pv-text-wrap" hidden>
+        <div class="preview-lines" id="pv-lines"></div>
+        <div class="preview-count" id="pv-count"></div>
+      </div>
+      <div class="preview-image" id="pv-image-wrap" hidden>
+        <div class="preview-img-box"><img id="pv-img" alt=""></div>
+        <div class="preview-img-meta">
+          <span id="pv-dims"></span>
+          <span class="muted" id="pv-size"></span>
+        </div>
+        <div class="preview-img-actions">
+          <button class="btn" id="pv-copy" type="button"><span data-icon="content_copy"></span>Copy</button>
+          <button class="btn" id="pv-save" type="button"><span data-icon="download"></span>Save as…</button>
+          <button class="btn" id="pv-open" type="button"><span data-icon="open_in_new"></span>Open</button>
+        </div>
+      </div>
+      <div class="preview-actions">
+        <button class="btn primary" id="pv-paste" type="button">Paste</button>
+        <button class="btn" id="pv-paste-plain" type="button">Paste as plain text</button>
+        <div class="spacer"></div>
+        <button class="btn icon-btn" id="pv-pin" type="button" title="Pin"><span data-icon="push_pin"></span></button>
+        <button class="btn icon-btn danger-icon" id="pv-delete" type="button" title="Delete"><span data-icon="delete"></span></button>
+      </div>
+    </aside>
+
+    <div class="menu" id="filter-menu" role="menu" hidden>
+      <button type="button" role="menuitemradio" data-filter="all">All<span data-icon="check"></span></button>
+      <button type="button" role="menuitemradio" data-filter="text">Text<span data-icon="check"></span></button>
+      <button type="button" role="menuitemradio" data-filter="images">Images<span data-icon="check"></span></button>
+    </div>
+  </div>
+  <script src="common.js"></script>
+  <script src="popup.js"></script>
 </body>
 </html>

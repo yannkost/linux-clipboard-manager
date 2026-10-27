@@ -1,44 +1,59 @@
 mod clipboard;
+mod commands;
 mod config;
 mod db;
 mod dbus;
+mod gnome;
 mod history;
+mod tray;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::RwLock;
+use std::sync::{Mutex, RwLock};
 use std::time::Duration;
 
-use base64::Engine;
-use serde::Serialize;
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Emitter, LogicalSize, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
-use clipboard::{Clipboard, Content, Snapshot};
+use clipboard::{Clipboard, Snapshot};
 use config::Config;
-use db::{Entry, Kind};
 use history::History;
 
 const APP_DIR: &str = "linux-clipboard-manager";
-const POPUP: &str = "popup";
-const LIST_LIMIT: usize = 200;
+pub const POPUP: &str = "popup";
+pub const SETTINGS: &str = "settings";
+pub const WELCOME: &str = "welcome";
+/// Transparent space around each window's card so its CSS shadow can fade
+/// out (body padding in ui/tokens.css: 20 top, 32 sides, 48 bottom).
+const SHADOW_MARGIN_X: f64 = 64.0;
+const SHADOW_MARGIN_Y: f64 = 68.0;
+const POPUP_WIDTH: f64 = 560.0;
+const POPUP_PREVIEW_WIDTH: f64 = 900.0;
+const POPUP_HEIGHT: f64 = 640.0;
 
 pub struct AppState {
     config: RwLock<Config>,
     pub history: History,
     pub clipboard: Clipboard,
     pub paused: AtomicBool,
+    /// A file dialog is open over the popup, so losing focus must not hide it.
+    pub dialog_open: AtomicBool,
+    /// Hash of content we just put on the clipboard ourselves, so the poller
+    /// does not record it again (which would bump it to the top).
+    pub own_clipboard: Mutex<Option<String>>,
 }
 
 impl AppState {
     pub fn config(&self) -> Config {
         self.config.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
+
+    pub fn set_config(&self, config: Config) {
+        *self.config.write().unwrap_or_else(|e| e.into_inner()) = config;
+    }
 }
 
-fn config_path() -> PathBuf {
+pub fn config_path() -> PathBuf {
     dirs::config_dir().unwrap_or_else(|| PathBuf::from(".config")).join(APP_DIR).join("config.toml")
 }
 
@@ -46,10 +61,11 @@ fn data_dir() -> PathBuf {
     dirs::data_dir().unwrap_or_else(|| PathBuf::from(".local/share")).join(APP_DIR)
 }
 
-// ---- popup window ----
+// ---- windows ----
 
 pub fn show_popup(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(POPUP) {
+        set_popup_wide(app, false);
         let _ = w.show();
         let _ = w.set_focus();
         let _ = w.emit("popup-shown", ());
@@ -70,10 +86,62 @@ pub fn toggle_popup(app: &AppHandle) {
     }
 }
 
+/// Widen the popup for the preview panel, or back to the list only.
+pub fn set_popup_wide(app: &AppHandle, wide: bool) {
+    if let Some(w) = app.get_webview_window(POPUP) {
+        let width = if wide { POPUP_PREVIEW_WIDTH } else { POPUP_WIDTH };
+        let _ = w.set_size(LogicalSize::new(width + SHADOW_MARGIN_X, POPUP_HEIGHT + SHADOW_MARGIN_Y));
+    }
+}
+
+fn build_window(app: &AppHandle, label: &str, url: String, title: &str, width: f64, height: f64) -> tauri::Result<()> {
+    let size = LogicalSize::new(width + SHADOW_MARGIN_X, height + SHADOW_MARGIN_Y);
+    let window = WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
+        .title(title)
+        .inner_size(size.width, size.height)
+        .decorations(false)
+        .transparent(true)
+        .resizable(false)
+        .center()
+        .build()?;
+    // GTK can map the window larger than requested; insist on the exact size.
+    window.set_size(size)?;
+    Ok(())
+}
+
+/// Open (or focus) the settings window on `page`, optionally asking to clear history.
+pub fn open_settings(app: &AppHandle, page: Option<&str>, confirm_clear: bool) {
+    hide_popup_window(app);
+    let page = page.unwrap_or("general");
+    if let Some(w) = app.get_webview_window(SETTINGS) {
+        let _ = w.show();
+        let _ = w.set_focus();
+        let _ = w.emit("open-page", serde_json::json!({ "page": page, "clear": confirm_clear }));
+        return;
+    }
+    let url = format!("settings.html?page={page}&clear={confirm_clear}");
+    if let Err(e) = build_window(app, SETTINGS, url, "Clips Settings", 720.0, 560.0) {
+        eprintln!("settings window: {e}");
+    }
+}
+
+fn open_welcome(app: &AppHandle) {
+    if let Err(e) = build_window(app, WELCOME, "welcome.html".into(), "Welcome to Clips", 480.0, 520.0) {
+        eprintln!("welcome window: {e}");
+    }
+}
+
 // ---- recording ----
 
-fn history_changed(app: &AppHandle) {
+pub fn history_changed(app: &AppHandle) {
     let _ = app.emit_to(POPUP, "history-changed", ());
+    tray::refresh(app);
+}
+
+/// Tell every window the settings changed (theme, shortcut, …).
+pub fn settings_changed(app: &AppHandle) {
+    let _ = app.emit("settings-changed", app.state::<AppState>().config());
+    tray::refresh(app);
 }
 
 pub fn record_text(app: &AppHandle, text: &str) -> Result<(), String> {
@@ -117,7 +185,12 @@ fn spawn_poller(app: AppHandle) {
             if last.as_deref() == Some(hash.as_str()) {
                 continue;
             }
+            let ours = state.own_clipboard.lock().unwrap_or_else(|e| e.into_inner()).take();
+            let is_ours = ours.as_deref() == Some(hash.as_str());
             last = Some(hash);
+            if is_ours {
+                continue;
+            }
             // Content copied while paused is remembered as "seen" but not stored.
             if state.paused.load(Ordering::Relaxed) {
                 continue;
@@ -132,6 +205,41 @@ fn spawn_poller(app: AppHandle) {
             }
         }
     });
+}
+
+/// Hourly cleanup for the "Keep history for" setting.
+fn spawn_expiry(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        let state = app.state::<AppState>();
+        match state.history.expire(state.config().retention_days) {
+            Ok(()) => history_changed(&app),
+            Err(e) => eprintln!("expiry: {e}"),
+        }
+        std::thread::sleep(Duration::from_secs(60 * 60));
+    });
+}
+
+/// Keep config.hotkey and the GNOME custom shortcut in step. An existing
+/// shortcut (possibly edited in GNOME Settings) wins; otherwise create one.
+fn sync_shortcut(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut config = state.config();
+    match gnome::find_binding() {
+        Some((_, binding)) if binding != config.hotkey => {
+            config.hotkey = binding;
+            if let Err(e) = config.save(&config_path()) {
+                eprintln!("config: {e}");
+            }
+            state.set_config(config);
+        }
+        Some(_) => {}
+        None if !config.hotkey.is_empty() => {
+            if let Err(e) = gnome::set_binding(&config.hotkey) {
+                eprintln!("shortcut: could not create GNOME shortcut: {e}");
+            }
+        }
+        None => {}
+    }
 }
 
 fn start_dbus(app: AppHandle) {
@@ -155,144 +263,12 @@ fn start_dbus(app: AppHandle) {
     });
 }
 
-// ---- commands for the UI ----
-
-#[derive(Serialize)]
-struct EntryView {
-    #[serde(flatten)]
-    entry: Entry,
-    /// data: URL of the PNG thumbnail for images.
-    thumbnail: Option<String>,
-}
-
-#[tauri::command]
-fn list_entries(state: tauri::State<'_, AppState>, query: Option<String>) -> Result<Vec<EntryView>, String> {
-    let entries = state.history.list(query.as_deref().unwrap_or(""), LIST_LIMIT)?;
-    Ok(entries
-        .into_iter()
-        .map(|mut entry| {
-            let thumbnail = entry.thumbnail.take().map(|t| {
-                format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(t))
-            });
-            EntryView { entry, thumbnail }
-        })
-        .collect())
-}
-
-#[tauri::command]
-async fn paste_entry(app: AppHandle, id: i64, plain: Option<bool>) -> Result<bool, String> {
-    let state = app.state::<AppState>();
-    let entry = state.history.get(id)?.ok_or("entry not found")?;
-    let content = match entry.kind {
-        Kind::Text => Content::Text(entry.text.unwrap_or_default()),
-        Kind::Image => {
-            let path = entry.image_path.ok_or("image file missing")?;
-            Content::Image(std::fs::read(&path).map_err(|e| format!("{path}: {e}"))?)
-        }
-    };
-    hide_popup_window(&app);
-    state.history.touch(id)?;
-    let paste = state.config().paste_after_select.then_some(plain.unwrap_or(false));
-    let pasted = state.clipboard.set(&content, paste).await?;
-    history_changed(&app);
-    Ok(pasted)
-}
-
-#[tauri::command]
-fn toggle_pin(app: AppHandle, state: tauri::State<'_, AppState>, id: i64) -> Result<bool, String> {
-    let pinned = state.history.toggle_pin(id)?.ok_or("entry not found")?;
-    history_changed(&app);
-    Ok(pinned)
-}
-
-#[tauri::command]
-fn delete_entry(app: AppHandle, state: tauri::State<'_, AppState>, id: i64) -> Result<(), String> {
-    state.history.delete(id)?;
-    history_changed(&app);
-    Ok(())
-}
-
-#[tauri::command]
-fn hide_popup(app: AppHandle) {
-    hide_popup_window(&app);
-}
-
-#[tauri::command]
-fn get_settings(state: tauri::State<'_, AppState>) -> Config {
-    state.config()
-}
-
-#[tauri::command]
-fn save_settings(app: AppHandle, state: tauri::State<'_, AppState>, settings: Config) -> Result<Config, String> {
-    settings.validate()?;
-    settings.save(&config_path()).map_err(|e| format!("could not save settings: {e}"))?;
-    let old = std::mem::replace(&mut *state.config.write().unwrap_or_else(|e| e.into_inner()), settings.clone());
-    state.history.set_limits(&settings);
-    if old.autostart != settings.autostart {
-        apply_autostart(&app, settings.autostart);
-    }
-    history_changed(&app);
-    Ok(settings)
-}
-
-fn apply_autostart(app: &AppHandle, enabled: bool) {
+pub fn apply_autostart(app: &AppHandle, enabled: bool) {
     let autolaunch = app.autolaunch();
     let result = if enabled { autolaunch.enable() } else { autolaunch.disable() };
     if let Err(e) = result {
         eprintln!("autostart: {e}");
     }
-}
-
-fn open_settings(app: &AppHandle) {
-    show_popup(app);
-    let _ = app.emit_to(POPUP, "open-settings", ());
-}
-
-// ---- tray ----
-
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "Show clipboard", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
-    let pause = CheckMenuItem::with_id(app, "pause", "Pause recording", true, false, None::<&str>)?;
-    let clear = MenuItem::with_id(app, "clear", "Clear history", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(
-        app,
-        &[
-            &show,
-            &settings,
-            &pause,
-            &PredefinedMenuItem::separator(app)?,
-            &clear,
-            &PredefinedMenuItem::separator(app)?,
-            &quit,
-        ],
-    )?;
-    let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("Clipboard history")
-        .menu(&menu)
-        .show_menu_on_left_click(true)
-        .on_menu_event(move |app, event| match event.id().as_ref() {
-            "show" => show_popup(app),
-            "settings" => open_settings(app),
-            "pause" => {
-                let paused = pause.is_checked().unwrap_or(false);
-                app.state::<AppState>().paused.store(paused, Ordering::Relaxed);
-            }
-            "clear" => {
-                if let Err(e) = app.state::<AppState>().history.clear_unpinned() {
-                    eprintln!("tray: clear failed: {e}");
-                }
-                history_changed(app);
-            }
-            "quit" => app.exit(0),
-            _ => {}
-        });
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
-    }
-    builder.build(app)?;
-    Ok(())
 }
 
 // ---- entry point ----
@@ -310,47 +286,86 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         // Must be first: a second launch (e.g. `linux-clipboard-manager --toggle`
-        // from a keyboard shortcut) toggles the popup of the running instance.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| toggle_popup(app)))
+        // from a keyboard shortcut) toggles the popup of the running instance,
+        // `--settings` opens the settings window.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if args.iter().any(|a| a == "--settings") {
+                open_settings(app, None, false);
+            } else {
+                toggle_popup(app);
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             config: RwLock::new(config),
             history,
             clipboard: Clipboard::new(),
             paused: AtomicBool::new(false),
+            dialog_open: AtomicBool::new(false),
+            own_clipboard: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
-            list_entries,
-            paste_entry,
-            toggle_pin,
-            delete_entry,
-            hide_popup,
-            get_settings,
-            save_settings
+            commands::list_entries,
+            commands::get_entry,
+            commands::get_image,
+            commands::paste_entry,
+            commands::paste_entries,
+            commands::copy_entry,
+            commands::toggle_pin,
+            commands::delete_entry,
+            commands::delete_entries,
+            commands::open_entry,
+            commands::save_image_as,
+            commands::hide_popup,
+            commands::set_preview,
+            commands::get_settings,
+            commands::save_settings,
+            commands::check_shortcut,
+            commands::get_status,
+            commands::clear_history,
+            commands::open_settings_window,
+            commands::close_window,
+            commands::finish_welcome,
+            commands::enable_extension,
+            commands::open_link
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             let state = handle.state::<AppState>();
 
             apply_autostart(&handle, state.config().autostart);
-            build_tray(&handle)?;
+            sync_shortcut(&handle);
+            tray::build(&handle)?;
             start_dbus(handle.clone());
             // Always running; it checks the poll_fallback setting on every tick.
             spawn_poller(handle.clone());
-            if !start_hidden {
+            spawn_expiry(handle.clone());
+            if !state.config().first_run_done {
+                open_welcome(&handle);
+            } else if !start_hidden {
                 show_popup(&handle);
             }
             Ok(())
         })
-        .on_window_event(|window, event| match event {
-            WindowEvent::CloseRequested { api, .. } => {
-                api.prevent_close();
-                let _ = window.hide();
+        .on_window_event(|window, event| {
+            // Only the popup is kept around; settings and welcome close normally.
+            if window.label() != POPUP {
+                return;
             }
-            WindowEvent::Focused(false) => {
-                let _ = window.hide();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                WindowEvent::Focused(false) => {
+                    let state = window.state::<AppState>();
+                    if !state.dialog_open.load(Ordering::Relaxed) {
+                        let _ = window.hide();
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

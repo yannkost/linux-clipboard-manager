@@ -11,7 +11,7 @@ use image::{ImageFormat, RgbaImage};
 use sha2::{Digest, Sha256};
 
 use crate::config::Config;
-use crate::db::{Db, Entry, NewImage};
+use crate::db::{Db, Entry, Filter, NewImage};
 
 pub const THUMB_WIDTH: u32 = 256;
 pub const THUMB_HEIGHT: u32 = 128;
@@ -155,8 +155,23 @@ impl History {
         Ok(ins.is_new)
     }
 
-    pub fn list(&self, query: &str, limit: usize) -> Result<Vec<Entry>, String> {
-        self.db().list(query, limit).map_err(|e| e.to_string())
+    pub fn list(&self, filter: &Filter, limit: usize) -> Result<Vec<Entry>, String> {
+        self.db().list(filter, limit).map_err(|e| e.to_string())
+    }
+
+    pub fn count(&self, filter: &Filter) -> Result<i64, String> {
+        self.db().count_matching(filter).map_err(|e| e.to_string())
+    }
+
+    /// Drop unpinned entries not used for `days` days (0 keeps everything).
+    pub fn expire(&self, days: u32) -> Result<(), String> {
+        if days == 0 {
+            return Ok(());
+        }
+        let cutoff = now_ms() - i64::from(days) * 24 * 60 * 60 * 1000;
+        let paths = self.db().delete_unused_since(cutoff).map_err(|e| e.to_string())?;
+        remove_files(&paths);
+        Ok(())
     }
 
     pub fn get(&self, id: i64) -> Result<Option<Entry>, String> {
@@ -222,14 +237,14 @@ mod tests {
         // Same pixels arriving as PNG are recognised as the same image.
         assert!(!h.add_image_encoded(&encode_png(&red).unwrap()).unwrap());
 
-        let entries = h.list("", 10).unwrap();
+        let entries = h.list(&Filter::default(), 10).unwrap();
         let path = PathBuf::from(entries[0].image_path.clone().unwrap());
         assert!(path.exists());
         assert!(entries[0].thumbnail.is_some());
 
         // max_items = 1, so new text pushes the image (and its file) out.
         assert!(h.add_text("hi").unwrap());
-        assert_eq!(h.list("", 10).unwrap().len(), 1);
+        assert_eq!(h.list(&Filter::default(), 10).unwrap().len(), 1);
         assert!(!path.exists());
     }
 
@@ -252,6 +267,6 @@ mod tests {
             h.add_text(t).unwrap();
         }
         h.set_limits(&Config { max_items: 1, ..Config::default() });
-        assert_eq!(h.list("", 10).unwrap().len(), 1);
+        assert_eq!(h.list(&Filter::default(), 10).unwrap().len(), 1);
     }
 }

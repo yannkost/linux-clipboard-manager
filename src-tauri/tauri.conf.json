@@ -12,9 +12,9 @@
     "windows": [
       {
         "label": "popup",
-        "title": "Clipboard",
-        "width": 608,
-        "height": 688,
+        "title": "Clips",
+        "width": 624,
+        "height": 708,
         "resizable": false,
         "decorations": false,
         "visible": false,

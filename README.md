@@ -1,9 +1,12 @@
-# linux-clipboard-manager
+# Clips (linux-clipboard-manager)
 
-A Ditto-style clipboard history manager for Linux: text and image history,
-tray icon, autostart, and a searchable popup on <kbd>Ctrl</kbd>+<kbd>I</kbd>.
+A Ditto-style clipboard history manager for Linux (GNOME, Wayland): text and
+image history, a searchable popup on <kbd>Ctrl</kbd>+<kbd>I</kbd>, pinned items,
+a preview panel, tray menu, autostart, and a libadwaita-style settings window.
 
-Built with Tauri 2 (Rust backend in `src-tauri/`, plain HTML/JS popup in `ui/`).
+Built with Tauri 2 (Rust backend in `src-tauri/`, plain HTML/JS in `ui/`, no
+build step). The UI follows the "Clips Desktop" design; its colour tokens live
+in `ui/tokens.css`.
 
 ## Build
 
@@ -18,40 +21,58 @@ Run `src-tauri/target/release/linux-clipboard-manager`. On first start it:
 
 - writes `~/.config/linux-clipboard-manager/config.toml` with defaults,
 - stores history in `~/.local/share/linux-clipboard-manager/` (`history.db` plus `images/*.png`),
-- adds an XDG autostart entry (`~/.config/autostart/`) that starts it hidden with `--hidden`.
+- adds an XDG autostart entry (`~/.config/autostart/`) that starts it hidden with `--hidden`,
+- creates (or adopts) a GNOME custom keyboard shortcut that runs `linux-clipboard-manager --toggle`,
+- shows a one-time welcome dialog.
+
+Command-line flags for a second launch: `--toggle` shows/hides the popup,
+`--settings` opens the settings window.
 
 ## Configuration
 
-Open *Settings…* from the tray menu, the ⚙ button in the popup, or <kbd>Ctrl</kbd>+<kbd>,</kbd>.
-Settings are saved to `config.toml`:
+Open *Settings* from the tray menu or with <kbd>Ctrl</kbd>+<kbd>,</kbd> in the
+popup. Changes apply immediately and are saved to `config.toml`:
 
-```toml
-hotkey = "<Control>i"          # GTK accelerator syntax
-max_items = 500                # unpinned entries kept
-max_image_bytes = 20971520     # larger images are skipped
-paste_after_select = false     # paste into the previous window (needs the GNOME helper)
-autostart = true
-poll_fallback = true           # poll the clipboard when the GNOME helper is missing
-```
+| Key | Default | |
+|---|---|---|
+| `hotkey` | `"<Control>i"` | GTK accelerator; empty disables it. Kept in sync with the GNOME custom shortcut |
+| `max_items` | `500` | unpinned entries kept |
+| `max_image_bytes` | `20971520` | larger images are skipped |
+| `retention_days` | `0` | delete unpinned entries unused for this long (0 = forever, or 1/7/30) |
+| `paste_after_select` | `false` | paste into the previous window (needs the GNOME helper) |
+| `move_to_top` | `true` | a pasted entry moves to the top of Recent |
+| `strip_formatting` | `false` | swap Enter and Shift+Enter |
+| `autostart` | `true` | |
+| `show_tray` | `true` | |
+| `theme` | `"system"` | `system`, `light` or `dark` |
+| `ignore_passwords` | `true` | needs the GNOME helper |
+| `excluded_apps` | `[]` | needs the GNOME helper |
+| `poll_fallback` | `true` | poll the clipboard when the GNOME helper is missing |
 
-## Opening the popup
+## The popup
 
-Wayland does not let normal apps grab global shortcuts. Until the GNOME Shell
-helper extension exists, bind a custom shortcut in
-*Settings → Keyboard → Custom Shortcuts* to the binary's full path plus
-`--toggle`, for example:
+Wayland does not let normal apps grab global shortcuts, so the app registers a
+GNOME custom shortcut (*Settings → Keyboard → Custom Shortcuts*) that runs the
+binary with `--toggle`. Change it from Clips' own Settings → Shortcut page,
+which also warns when GNOME already uses the combination.
 
-```
-/home/you/linux-clipboard-manager/src-tauri/target/release/linux-clipboard-manager --toggle
-```
+| Key | Action |
+|---|---|
+| type | filter |
+| <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd> | move |
+| <kbd>Enter</kbd> / double-click | paste |
+| <kbd>Shift</kbd>+<kbd>Enter</kbd> | paste as plain text |
+| <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | paste that row of the open tab |
+| <kbd>Tab</kbd> | switch Recent / Pinned |
+| <kbd>Ctrl</kbd>+<kbd>P</kbd> | pin / unpin |
+| <kbd>Del</kbd> | remove |
+| <kbd>Space</kbd> or <kbd>→</kbd> / <kbd>←</kbd> | open / close the preview |
+| <kbd>Ctrl</kbd>+click, <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd> | multi-select (Enter pastes all, Del removes all) |
+| <kbd>Ctrl</kbd>+<kbd>,</kbd> | settings |
+| <kbd>Esc</kbd> | close preview, clear selection, clear search, then close |
 
-GNOME does not expand `~` in shortcut commands, so use an absolute path.
-
-A second launch toggles the popup of the running instance.
-
-Popup keys: arrows to move, <kbd>Enter</kbd> paste, <kbd>Shift</kbd>+<kbd>Enter</kbd>
-paste as plain text, <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> paste that row,
-<kbd>Ctrl</kbd>+<kbd>P</kbd> pin, <kbd>Del</kbd> delete, <kbd>Esc</kbd> close.
+Entries are shown as links, file paths, colours, code, text or images,
+detected from their content.
 
 ## D-Bus interface
 
@@ -71,3 +92,10 @@ It calls the GNOME Shell helper extension at `org.gnome.Shell`
 `Paste(b plain)`, `Version() → u`. When it is not there, the app polls the
 clipboard every 500 ms with arboard instead, and selecting an entry only puts
 it on the clipboard (you paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> yourself).
+
+## Credits
+
+Bundled fonts: [Inter](https://rsms.me/inter/) and
+[JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL Open Font License),
+and a subset of [Material Symbols Rounded](https://fonts.google.com/icons)
+(Apache License 2.0).

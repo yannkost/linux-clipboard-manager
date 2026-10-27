@@ -21,6 +21,13 @@ pub enum Kind {
 }
 
 impl Kind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Kind::Text => "text",
+            Kind::Image => "image",
+        }
+    }
+
     fn parse(s: &str) -> Kind {
         if s == "image" {
             Kind::Image
@@ -64,6 +71,36 @@ pub struct Inserted {
     pub id: i64,
     /// False when the content was already in history and only got bumped.
     pub is_new: bool,
+}
+
+/// Which entries [`Db::list`] and [`Db::count_matching`] return.
+#[derive(Debug, Clone, Default)]
+pub struct Filter<'a> {
+    /// Case-insensitive substring of the text (images match on "image W×H png").
+    pub query: &'a str,
+    pub kind: Option<Kind>,
+    pub pinned: Option<bool>,
+}
+
+impl Filter<'_> {
+    /// WHERE clause using ?1..?4, and the values to bind to them.
+    fn sql(&self) -> (&'static str, (String, String, Option<&'static str>, Option<i64>)) {
+        let query = self.query.trim();
+        let cond = "(?1 = ''
+              OR (kind = 'text' AND text LIKE ?2 ESCAPE '\\')
+              OR (kind = 'image' AND ('image ' || width || '×' || height || ' png') LIKE ?2 ESCAPE '\\'))
+             AND (?3 IS NULL OR kind = ?3)
+             AND (?4 IS NULL OR pinned = ?4)";
+        (
+            cond,
+            (
+                query.to_string(),
+                like_pattern(query),
+                self.kind.map(Kind::as_str),
+                self.pinned.map(i64::from),
+            ),
+        )
+    }
 }
 
 pub struct Db {
@@ -213,16 +250,19 @@ impl Db {
             > 0)
     }
 
-    /// Pinned entries first, then most recently used. Text is truncated to a preview.
-    pub fn list(&self, query: &str, limit: usize) -> rusqlite::Result<Vec<Entry>> {
-        let query = query.trim();
+    /// Matching entries, pinned first, then most recently used. Text is
+    /// truncated to a preview.
+    pub fn list(&self, filter: &Filter, limit: usize) -> rusqlite::Result<Vec<Entry>> {
+        let (cond, args) = filter.sql();
         let mut stmt = self.conn.prepare(&format!(
-            "SELECT {COLUMNS} FROM entries
-             WHERE ?1 = '' OR (kind = 'text' AND text LIKE ?2 ESCAPE '\\')
+            "SELECT {COLUMNS} FROM entries WHERE {cond}
              ORDER BY pinned DESC, last_used_at DESC, id DESC
-             LIMIT ?3"
+             LIMIT ?5"
         ))?;
-        let rows = stmt.query_map(params![query, like_pattern(query), limit as i64], row_to_entry)?;
+        let rows = stmt.query_map(
+            params![args.0, args.1, args.2, args.3, limit as i64],
+            row_to_entry,
+        )?;
         rows.map(|r| {
             r.map(|mut e| {
                 if let Some(t) = &e.text {
@@ -234,6 +274,16 @@ impl Db {
             })
         })
         .collect()
+    }
+
+    /// Number of entries matching `filter`.
+    pub fn count_matching(&self, filter: &Filter) -> rusqlite::Result<i64> {
+        let (cond, args) = filter.sql();
+        self.conn.query_row(
+            &format!("SELECT COUNT(*) FROM entries WHERE {cond}"),
+            params![args.0, args.1, args.2, args.3],
+            |r| r.get(0),
+        )
     }
 
     pub fn toggle_pin(&self, id: i64) -> rusqlite::Result<Option<bool>> {
@@ -285,6 +335,14 @@ impl Db {
         )
     }
 
+    /// Delete unpinned entries last used before `cutoff`. Returns image files to remove.
+    pub fn delete_unused_since(&self, cutoff: i64) -> rusqlite::Result<Vec<PathBuf>> {
+        self.delete_where(
+            "DELETE FROM entries WHERE pinned = 0 AND last_used_at < ?1 RETURNING image_path",
+            [cutoff],
+        )
+    }
+
     #[cfg(test)]
     pub fn count(&self) -> rusqlite::Result<i64> {
         self.conn.query_row("SELECT COUNT(*) FROM entries", [], |r| r.get(0))
@@ -330,7 +388,7 @@ mod tests {
         let e = db.get(a.id).unwrap().unwrap();
         assert_eq!(e.created_at, 100);
         assert_eq!(e.last_used_at, 200);
-        assert_eq!(db.list("", 10).unwrap()[0].id, a.id);
+        assert_eq!(db.list(&Filter::default(), 10).unwrap()[0].id, a.id);
     }
 
     #[test]
@@ -355,9 +413,9 @@ mod tests {
         let mid = db.insert_text("mid", 2).unwrap().id;
         let new = db.insert_text("new", 3).unwrap().id;
         db.toggle_pin(old).unwrap();
-        let ids: Vec<i64> = db.list("", 10).unwrap().iter().map(|e| e.id).collect();
+        let ids: Vec<i64> = db.list(&Filter::default(), 10).unwrap().iter().map(|e| e.id).collect();
         assert_eq!(ids, vec![old, new, mid]);
-        assert_eq!(db.list("", 2).unwrap().len(), 2);
+        assert_eq!(db.list(&Filter::default(), 2).unwrap().len(), 2);
     }
 
     #[test]
@@ -368,13 +426,13 @@ mod tests {
         db.insert_text("snake_case", 3).unwrap();
         image(&db, "img", 4);
         let texts = |q: &str| -> Vec<String> {
-            db.list(q, 10).unwrap().into_iter().filter_map(|e| e.text).collect()
+            db.list(&Filter { query: q, ..Filter::default() }, 10).unwrap().into_iter().filter_map(|e| e.text).collect()
         };
         assert_eq!(texts("hello"), vec!["Hello World"]);
         assert_eq!(texts("%"), vec!["100% sure"]);
         assert_eq!(texts("_"), vec!["snake_case"]);
         assert!(texts("zzz").is_empty());
-        assert_eq!(db.list("  ", 10).unwrap().len(), 4);
+        assert_eq!(db.list(&Filter { query: "  ", ..Filter::default() }, 10).unwrap().len(), 4);
     }
 
     #[test]
@@ -382,7 +440,7 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         let long = "é".repeat(PREVIEW_CHARS + 50);
         let id = db.insert_text(&long, 1).unwrap().id;
-        let listed = db.list("", 10).unwrap();
+        let listed = db.list(&Filter::default(), 10).unwrap();
         assert_eq!(listed[0].text.as_ref().unwrap().chars().count(), PREVIEW_CHARS);
         assert_eq!(db.get(id).unwrap().unwrap().text.unwrap(), long);
     }
@@ -418,7 +476,7 @@ mod tests {
         }
         let removed = db.prune(3).unwrap();
         assert_eq!(removed, vec![PathBuf::from("/tmp/oldimg.png")]);
-        let texts: Vec<String> = db.list("", 100).unwrap().into_iter().filter_map(|e| e.text).collect();
+        let texts: Vec<String> = db.list(&Filter::default(), 100).unwrap().into_iter().filter_map(|e| e.text).collect();
         assert_eq!(texts, vec!["pinned", "t9", "t8", "t7"]);
         assert!(db.prune(3).unwrap().is_empty());
     }
@@ -442,7 +500,36 @@ mod tests {
         db.insert_text("b", 2).unwrap();
         assert!(db.touch(a, 3).unwrap());
         assert!(!db.touch(999, 3).unwrap());
-        assert_eq!(db.list("", 10).unwrap()[0].id, a);
+        assert_eq!(db.list(&Filter::default(), 10).unwrap()[0].id, a);
+    }
+
+    #[test]
+    fn filters_by_kind_pinned_and_image_dims() {
+        let db = Db::open_in_memory().unwrap();
+        let t = db.insert_text("note", 1).unwrap().id;
+        let i = image(&db, "img", 2).id;
+        db.toggle_pin(t).unwrap();
+        let ids = |f: Filter| db.list(&f, 10).unwrap().iter().map(|e| e.id).collect::<Vec<_>>();
+        assert_eq!(ids(Filter { kind: Some(Kind::Image), ..Filter::default() }), vec![i]);
+        assert_eq!(ids(Filter { kind: Some(Kind::Text), ..Filter::default() }), vec![t]);
+        assert_eq!(ids(Filter { pinned: Some(true), ..Filter::default() }), vec![t]);
+        assert_eq!(ids(Filter { pinned: Some(false), ..Filter::default() }), vec![i]);
+        assert_eq!(ids(Filter { query: "10×5", ..Filter::default() }), vec![i]);
+        assert_eq!(db.count_matching(&Filter { query: "no", ..Filter::default() }).unwrap(), 1);
+        assert_eq!(db.count_matching(&Filter::default()).unwrap(), 2);
+    }
+
+    #[test]
+    fn retention_deletes_only_old_unpinned() {
+        let db = Db::open_in_memory().unwrap();
+        let old_pinned = db.insert_text("old pinned", 1).unwrap().id;
+        db.toggle_pin(old_pinned).unwrap();
+        image(&db, "oldimg", 2);
+        let fresh = db.insert_text("fresh", 100).unwrap().id;
+        assert_eq!(db.delete_unused_since(50).unwrap(), vec![PathBuf::from("/tmp/oldimg.png")]);
+        let mut left: Vec<i64> = db.list(&Filter::default(), 10).unwrap().iter().map(|e| e.id).collect();
+        left.sort();
+        assert_eq!(left, vec![old_pinned, fresh]);
     }
 
     #[test]
@@ -454,6 +541,6 @@ mod tests {
             db.insert_text("survives", 1).unwrap();
         }
         let db = Db::open(&path).unwrap();
-        assert_eq!(db.list("surv", 10).unwrap().len(), 1);
+        assert_eq!(db.list(&Filter { query: "surv", ..Filter::default() }, 10).unwrap().len(), 1);
     }
 }
