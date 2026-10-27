@@ -135,7 +135,6 @@ fn open_welcome(app: &AppHandle) {
 
 pub fn history_changed(app: &AppHandle) {
     let _ = app.emit_to(POPUP, "history-changed", ());
-    tray::refresh(app);
 }
 
 /// Tell every window the settings changed (theme, shortcut, …).

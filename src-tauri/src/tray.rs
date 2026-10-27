@@ -1,5 +1,5 @@
-//! Panel icon and its menu: show, the last five entries, pause, clear,
-//! settings, quit. The menu is rebuilt whenever the history changes.
+//! Panel icon and its menu: show, pause, clear, settings, quit. The menu is
+//! rebuilt when the pause state or the shortcut changes.
 
 use std::sync::atomic::Ordering;
 
@@ -8,12 +8,9 @@ use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, Wry};
 
-use crate::db::{Filter, Kind};
 use crate::{gnome, AppState};
 
 const TRAY_ID: &str = "main";
-const RECENT_IN_MENU: usize = 5;
-const LABEL_CHARS: usize = 48;
 
 /// "<Control><Alt>t" → "Ctrl+Alt+T"
 pub fn pretty_hotkey(accel: &str) -> String {
@@ -37,15 +34,6 @@ pub fn pretty_hotkey(accel: &str) -> String {
     parts.join("+")
 }
 
-fn one_line(text: &str) -> String {
-    let line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if line.chars().count() > LABEL_CHARS {
-        format!("{}…", line.chars().take(LABEL_CHARS - 1).collect::<String>().trim_end())
-    } else {
-        line
-    }
-}
-
 fn icon(app: &AppHandle) -> tauri::Result<Image<'static>> {
     let paused = app.state::<AppState>().paused.load(Ordering::Relaxed);
     // Light glyph on a dark panel, dark glyph on a light one.
@@ -64,22 +52,6 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let show_label = if hotkey.is_empty() { "Show clipboard".to_string() } else { format!("Show clipboard ({hotkey})") };
     let menu = Menu::new(app)?;
     menu.append(&MenuItem::with_id(app, "show", show_label, true, None::<&str>)?)?;
-
-    let recent = state
-        .history
-        .list(&Filter { pinned: Some(false), ..Filter::default() }, RECENT_IN_MENU)
-        .unwrap_or_default();
-    if !recent.is_empty() {
-        menu.append(&PredefinedMenuItem::separator(app)?)?;
-        for e in recent {
-            let label = match e.kind {
-                Kind::Text => one_line(e.text.as_deref().unwrap_or_default()),
-                Kind::Image => format!("Image {}×{}", e.width.unwrap_or(0), e.height.unwrap_or(0)),
-            };
-            menu.append(&MenuItem::with_id(app, format!("entry:{}", e.id), label, true, None::<&str>)?)?;
-        }
-    }
-
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     let paused = state.paused.load(Ordering::Relaxed);
     menu.append(&CheckMenuItem::with_id(app, "pause", "Pause recording", true, paused, None::<&str>)?)?;
@@ -101,17 +73,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
         "clear" => crate::open_settings(app, Some("history"), true),
         "settings" => crate::open_settings(app, None, false),
         "quit" => app.exit(0),
-        _ => {
-            if let Some(entry_id) = id.strip_prefix("entry:").and_then(|n| n.parse::<i64>().ok()) {
-                let app = app.clone();
-                let plain = app.state::<AppState>().config().strip_formatting;
-                tauri::async_runtime::spawn(async move {
-                    if let Err(e) = crate::commands::use_entry(&app, entry_id, plain).await {
-                        eprintln!("tray: {e}");
-                    }
-                });
-            }
-        }
+        _ => {}
     }
 }
 
@@ -127,7 +89,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Rebuild the menu and icon after history, pause or settings changes.
+/// Rebuild the menu and icon after pause or settings changes.
 pub fn refresh(app: &AppHandle) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
     let result = (|| -> tauri::Result<()> {
@@ -145,11 +107,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn formats_hotkeys_and_labels() {
+    fn formats_hotkeys() {
         assert_eq!(pretty_hotkey("<Control>i"), "Ctrl+I");
         assert_eq!(pretty_hotkey("<Primary><Alt>t"), "Ctrl+Alt+T");
         assert_eq!(pretty_hotkey(""), "");
-        assert_eq!(one_line("a\n  b"), "a b");
-        assert_eq!(one_line(&"x".repeat(60)).chars().count(), LABEL_CHARS);
     }
 }
