@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions for the clipboard popup",
+  "windows": ["popup"],
+  "permissions": ["core:default"]
+}

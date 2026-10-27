@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clipboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <input id="search" type="search" placeholder="Search clipboard history…" autocomplete="off" spellcheck="false">
+  </header>
+  <ul id="list" role="listbox" aria-label="Clipboard history"></ul>
+  <p id="empty" hidden>Nothing here yet. Copy something!</p>
+  <footer>
+    <span><kbd>Enter</kbd> paste</span>
+    <span><kbd>Shift+Enter</kbd> plain</span>
+    <span><kbd>Ctrl+P</kbd> pin</span>
+    <span><kbd>Del</kbd> delete</span>
+    <span><kbd>Esc</kbd> close</span>
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>
