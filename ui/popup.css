@@ -49,7 +49,8 @@
 .chip .icon { color: var(--text-muted); }
 
 /* Tabs */
-.tabs-bar { flex-shrink: 0; display: flex; padding: 10px 12px 4px; }
+/* 10px above the tabs (to the header) and below them (6px + the list's 4px top padding). */
+.tabs-bar { flex-shrink: 0; display: flex; padding: 10px 12px 6px; }
 .segmented .count { font-size: 11.5px; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 /* List */
