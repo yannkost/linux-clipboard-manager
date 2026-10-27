@@ -6,7 +6,7 @@
   --hover: #f3f4f6;
   --selected: #dbe9fb;
   --accent: #3465a4;
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.16);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.22), 0 1px 4px rgba(0, 0, 0, 0.14);
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -18,15 +18,16 @@
     --hover: #2a2c30;
     --selected: #2d4466;
     --accent: #7fa7e0;
-    --shadow: 0 8px 28px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.35);
   }
 }
 * { box-sizing: border-box; }
 /* The window itself is transparent and #card is the visible popup, inset so
-   its shadow has room to show. The background must not sit on <body>: with
+   its shadow has room to fade out. Keep padding >= blur + y-offset of
+   --shadow, or the shadow gets cut at the window edge. The background must not sit on <body>: with
    none on <html>, the browser would paint it across the whole window. */
 html, body { height: 100%; margin: 0; background: transparent; }
-body { padding: 16px; }
+body { padding: 24px; }
 #card {
   height: 100%;
   border-radius: 10px;

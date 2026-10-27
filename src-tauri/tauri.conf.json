@@ -13,8 +13,8 @@
       {
         "label": "popup",
         "title": "Clipboard",
-        "width": 592,
-        "height": 672,
+        "width": 608,
+        "height": 688,
         "resizable": false,
         "decorations": false,
         "visible": false,
