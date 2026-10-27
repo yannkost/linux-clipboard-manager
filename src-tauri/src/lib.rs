@@ -20,6 +20,8 @@ use config::Config;
 use history::History;
 
 const APP_DIR: &str = "linux-clipboard-manager";
+/// Set by build.rs from the ui/ contents; reading it makes UI edits rebuild the crate.
+const _ASSETS_HASH: &str = env!("CLIPS_ASSETS_HASH");
 pub const POPUP: &str = "popup";
 pub const SETTINGS: &str = "settings";
 pub const WELCOME: &str = "welcome";

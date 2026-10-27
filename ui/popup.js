@@ -99,8 +99,17 @@ function renderRow(entry, index) {
       onclick: (e) => { e.stopPropagation(); call("open_entry", { id: entry.id }); },
     }, icon("open_in_new")));
   }
-  if (entry.pinned && state.tab === "recent") trail.append(icon("push_pin", "pin-mark filled"));
   trail.append(el("span", { class: "time" }, relTime(entry.last_used_at)));
+  trail.append(el("button", {
+    class: `pin-btn${entry.pinned ? " pinned" : ""}`, type: "button",
+    title: entry.pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)", "aria-pressed": entry.pinned ? "true" : "false",
+    onclick: async (e) => {
+      e.stopPropagation();
+      await call("toggle_pin", { id: entry.id });
+      await refresh();
+      search.focus();
+    },
+  }, icon("push_pin", entry.pinned ? "filled" : "")));
   row.append(trail);
 
   row.addEventListener("click", (e) => {
@@ -125,8 +134,8 @@ function renderHints() {
     hints.append(b("↵"), " Paste all · ", b("Del"), " Remove all · ", b("Esc"), " Clear selection");
     $("count-label").textContent = `${state.multi.size} selected`;
   } else {
-    const alt = state.settings.strip_formatting ? "Paste with formatting" : "Paste as plain text";
-    hints.append(b("↵"), " Paste · ", b("Shift+↵"), ` ${alt} · `, b("Ctrl+P"), " Pin · ", b("Del"), " Remove · ", b("Esc"), " Close");
+    const alt = state.settings.strip_formatting ? "With formatting" : "Plain text";
+    hints.append(b("↵"), " Paste · ", b("Shift+↵"), ` ${alt} · `, b("Space"), " Preview · ", b("Ctrl+P"), " Pin · ", b("Del"), " Remove · ", b("Esc"), " Close");
     const n = state.entries.length;
     $("count-label").textContent = `${n} ${n === 1 ? "item" : "items"}`;
   }

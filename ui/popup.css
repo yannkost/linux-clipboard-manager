@@ -194,8 +194,7 @@
   padding-left: 4px;
 }
 .time { font-size: 12px; line-height: 16px; color: var(--text-muted); white-space: nowrap; }
-.pin-mark { font-size: 14px; color: var(--accent-text); }
-.open-btn {
+.pin-btn, .open-btn {
   width: 24px;
   height: 24px;
   border: none;
@@ -208,8 +207,11 @@
   cursor: pointer;
   padding: 0;
 }
-.open-btn .icon { font-size: 16px; }
-.open-btn:hover { background: var(--icon-bg); color: var(--text); }
+.pin-btn .icon, .open-btn .icon { font-size: 16px; }
+.pin-btn:hover, .open-btn:hover { background: var(--icon-bg); color: var(--text); }
+.pin-btn { opacity: 0.55; }
+.row:hover .pin-btn, .row.sel .pin-btn, .pin-btn:focus-visible { opacity: 1; }
+.pin-btn.pinned { opacity: 1; color: var(--accent-text); }
 
 /* Empty states */
 .empty {
