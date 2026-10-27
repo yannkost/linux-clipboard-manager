@@ -6,6 +6,7 @@ mod history;
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::RwLock;
 use std::time::Duration;
 
 use base64::Engine;
@@ -25,10 +26,16 @@ const POPUP: &str = "popup";
 const LIST_LIMIT: usize = 200;
 
 pub struct AppState {
-    pub config: Config,
+    config: RwLock<Config>,
     pub history: History,
     pub clipboard: Clipboard,
     pub paused: AtomicBool,
+}
+
+impl AppState {
+    pub fn config(&self) -> Config {
+        self.config.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
 }
 
 fn config_path() -> PathBuf {
@@ -99,7 +106,7 @@ fn spawn_poller(app: AppHandle) {
             std::thread::sleep(Duration::from_millis(500));
             tick += 1;
             let state = app.state::<AppState>();
-            if state.clipboard.helper_active() {
+            if state.clipboard.helper_active() || !state.config().poll_fallback {
                 continue;
             }
             let Some(snapshot) = state.clipboard.read(tick % 4 == 0) else { continue };
@@ -185,7 +192,7 @@ async fn paste_entry(app: AppHandle, id: i64, plain: Option<bool>) -> Result<boo
     };
     hide_popup_window(&app);
     state.history.touch(id)?;
-    let paste = state.config.paste_after_select.then_some(plain.unwrap_or(false));
+    let paste = state.config().paste_after_select.then_some(plain.unwrap_or(false));
     let pasted = state.clipboard.set(&content, paste).await?;
     history_changed(&app);
     Ok(pasted)
@@ -210,10 +217,42 @@ fn hide_popup(app: AppHandle) {
     hide_popup_window(&app);
 }
 
+#[tauri::command]
+fn get_settings(state: tauri::State<'_, AppState>) -> Config {
+    state.config()
+}
+
+#[tauri::command]
+fn save_settings(app: AppHandle, state: tauri::State<'_, AppState>, settings: Config) -> Result<Config, String> {
+    settings.validate()?;
+    settings.save(&config_path()).map_err(|e| format!("could not save settings: {e}"))?;
+    let old = std::mem::replace(&mut *state.config.write().unwrap_or_else(|e| e.into_inner()), settings.clone());
+    state.history.set_limits(&settings);
+    if old.autostart != settings.autostart {
+        apply_autostart(&app, settings.autostart);
+    }
+    history_changed(&app);
+    Ok(settings)
+}
+
+fn apply_autostart(app: &AppHandle, enabled: bool) {
+    let autolaunch = app.autolaunch();
+    let result = if enabled { autolaunch.enable() } else { autolaunch.disable() };
+    if let Err(e) = result {
+        eprintln!("autostart: {e}");
+    }
+}
+
+fn open_settings(app: &AppHandle) {
+    show_popup(app);
+    let _ = app.emit_to(POPUP, "open-settings", ());
+}
+
 // ---- tray ----
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Show clipboard", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let pause = CheckMenuItem::with_id(app, "pause", "Pause recording", true, false, None::<&str>)?;
     let clear = MenuItem::with_id(app, "clear", "Clear history", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -221,6 +260,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         app,
         &[
             &show,
+            &settings,
             &pause,
             &PredefinedMenuItem::separator(app)?,
             &clear,
@@ -234,6 +274,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "show" => show_popup(app),
+            "settings" => open_settings(app),
             "pause" => {
                 let paused = pause.is_checked().unwrap_or(false);
                 app.state::<AppState>().paused.store(paused, Ordering::Relaxed);
@@ -273,7 +314,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| toggle_popup(app)))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
         .manage(AppState {
-            config,
+            config: RwLock::new(config),
             history,
             clipboard: Clipboard::new(),
             paused: AtomicBool::new(false),
@@ -283,24 +324,19 @@ pub fn run() {
             paste_entry,
             toggle_pin,
             delete_entry,
-            hide_popup
+            hide_popup,
+            get_settings,
+            save_settings
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             let state = handle.state::<AppState>();
 
-            let autolaunch = handle.autolaunch();
-            let result =
-                if state.config.autostart { autolaunch.enable() } else { autolaunch.disable() };
-            if let Err(e) = result {
-                eprintln!("autostart: {e}");
-            }
-
+            apply_autostart(&handle, state.config().autostart);
             build_tray(&handle)?;
             start_dbus(handle.clone());
-            if state.config.poll_fallback {
-                spawn_poller(handle.clone());
-            }
+            // Always running; it checks the poll_fallback setting on every tick.
+            spawn_poller(handle.clone());
             if !start_hidden {
                 show_popup(&handle);
             }

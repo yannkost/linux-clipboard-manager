@@ -9,15 +9,55 @@
 <body>
   <header>
     <input id="search" type="search" placeholder="Search clipboard history…" autocomplete="off" spellcheck="false">
+    <button id="open-settings" type="button" title="Settings (Ctrl+,)" aria-label="Settings">⚙</button>
   </header>
-  <ul id="list" role="listbox" aria-label="Clipboard history"></ul>
-  <p id="empty" hidden>Nothing here yet. Copy something!</p>
-  <footer>
+  <main id="history-view">
+    <ul id="list" role="listbox" aria-label="Clipboard history"></ul>
+    <p id="empty" hidden>Nothing here yet. Copy something!</p>
+  </main>
+  <form id="settings-view" hidden>
+    <h2>Settings</h2>
+    <label class="check">
+      <input type="checkbox" name="paste_after_select">
+      <span>Paste automatically after selecting an entry
+        <small>Needs the GNOME helper extension (not available yet). When off, the entry is only copied and you press Ctrl+V yourself.</small>
+      </span>
+    </label>
+    <label class="field">
+      <span>Maximum entries to keep <small>Pinned entries don't count.</small></span>
+      <input type="number" name="max_items" min="1" max="100000" step="1" required>
+    </label>
+    <label class="field">
+      <span>Maximum image size (MB) <small>Larger images are not saved.</small></span>
+      <input type="number" name="max_image_mb" min="1" max="1024" step="1" required>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="autostart">
+      <span>Start at login</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="poll_fallback">
+      <span>Record the clipboard by polling
+        <small>Used while the GNOME helper extension is not installed.</small>
+      </span>
+    </label>
+    <label class="field">
+      <span>Shortcut <small>Used by the GNOME helper extension. Until then, set it under Settings → Keyboard → Custom Shortcuts.</small></span>
+      <input type="text" name="hotkey" required spellcheck="false">
+    </label>
+    <p id="settings-error" role="alert" hidden></p>
+    <div class="buttons">
+      <button type="button" id="cancel-settings">Cancel</button>
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+  <footer id="history-footer">
     <span><kbd>Enter</kbd> paste</span>
     <span><kbd>Shift+Enter</kbd> plain</span>
     <span><kbd>Ctrl+P</kbd> pin</span>
     <span><kbd>Del</kbd> delete</span>
     <span><kbd>Esc</kbd> close</span>
+    <span><kbd>Ctrl+,</kbd> settings</span>
   </footer>
   <script src="app.js"></script>
 </body>

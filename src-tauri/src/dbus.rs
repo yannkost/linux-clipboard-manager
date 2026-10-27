@@ -42,7 +42,7 @@ impl Service {
     /// The configured shortcut, for the helper extension to bind.
     #[zbus(property)]
     async fn hotkey(&self) -> String {
-        self.app.state::<AppState>().config.hotkey.clone()
+        self.app.state::<AppState>().config().hotkey
     }
 }
 

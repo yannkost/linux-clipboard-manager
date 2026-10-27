@@ -5,6 +5,11 @@ const { listen } = window.__TAURI__.event;
 const search = document.getElementById("search");
 const list = document.getElementById("list");
 const empty = document.getElementById("empty");
+const historyView = document.getElementById("history-view");
+const historyFooter = document.getElementById("history-footer");
+const settingsForm = document.getElementById("settings-view");
+const settingsError = document.getElementById("settings-error");
+const MB = 1024 * 1024;
 
 let entries = [];
 let selected = 0;
@@ -101,7 +106,78 @@ async function act(command) {
   await refresh();
 }
 
+// ---- settings ----
+
+function settingsOpen() {
+  return !settingsForm.hidden;
+}
+
+async function showSettings() {
+  let s;
+  try {
+    s = await invoke("get_settings");
+  } catch (err) {
+    console.error("get_settings failed", err);
+    return;
+  }
+  const f = settingsForm.elements;
+  f.paste_after_select.checked = s.paste_after_select;
+  f.max_items.value = s.max_items;
+  f.max_image_mb.value = Math.round(s.max_image_bytes / MB);
+  f.autostart.checked = s.autostart;
+  f.poll_fallback.checked = s.poll_fallback;
+  f.hotkey.value = s.hotkey;
+  settingsError.hidden = true;
+  historyView.hidden = historyFooter.hidden = search.hidden = true;
+  settingsForm.hidden = false;
+  f.paste_after_select.focus();
+}
+
+function showHistory() {
+  settingsForm.hidden = true;
+  historyView.hidden = historyFooter.hidden = search.hidden = false;
+  search.focus();
+}
+
+settingsForm.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const f = settingsForm.elements;
+  const settings = {
+    paste_after_select: f.paste_after_select.checked,
+    max_items: Number(f.max_items.value),
+    max_image_bytes: Number(f.max_image_mb.value) * MB,
+    autostart: f.autostart.checked,
+    poll_fallback: f.poll_fallback.checked,
+    hotkey: f.hotkey.value.trim(),
+  };
+  try {
+    await invoke("save_settings", { settings });
+    showHistory();
+    refresh(false);
+  } catch (err) {
+    settingsError.textContent = String(err);
+    settingsError.hidden = false;
+  }
+});
+
+document.getElementById("cancel-settings").addEventListener("click", showHistory);
+document.getElementById("open-settings").addEventListener("click", showSettings);
+
+// ---- keyboard ----
+
 document.addEventListener("keydown", (ev) => {
+  if (ev.ctrlKey && ev.key === ",") {
+    settingsOpen() ? showHistory() : showSettings();
+    ev.preventDefault();
+    return;
+  }
+  if (settingsOpen()) {
+    if (ev.key === "Escape") {
+      showHistory();
+      ev.preventDefault();
+    }
+    return;
+  }
   switch (ev.key) {
     case "ArrowDown":
       selected = Math.min(selected + 1, entries.length - 1);
@@ -151,7 +227,9 @@ search.addEventListener("input", () => {
   searchTimer = setTimeout(() => refresh(false), 80);
 });
 
+listen("open-settings", () => showSettings());
 listen("popup-shown", () => {
+  showHistory();
   search.value = "";
   selected = 0;
   refresh(false);

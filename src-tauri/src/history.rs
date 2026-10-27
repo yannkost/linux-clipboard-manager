@@ -3,6 +3,7 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -47,8 +48,8 @@ pub fn thumbnail_png(img: &RgbaImage) -> Result<Vec<u8>, String> {
 pub struct History {
     db: Mutex<Db>,
     images_dir: PathBuf,
-    max_items: usize,
-    max_image_bytes: usize,
+    max_items: AtomicUsize,
+    max_image_bytes: AtomicUsize,
 }
 
 impl History {
@@ -59,8 +60,8 @@ impl History {
         Ok(History {
             db: Mutex::new(db),
             images_dir,
-            max_items: config.max_items,
-            max_image_bytes: config.max_image_bytes,
+            max_items: AtomicUsize::new(config.max_items),
+            max_image_bytes: AtomicUsize::new(config.max_image_bytes),
         })
     }
 
@@ -68,8 +69,19 @@ impl History {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// Apply changed settings, dropping entries beyond a lowered limit right away.
+    pub fn set_limits(&self, config: &Config) {
+        self.max_items.store(config.max_items, Ordering::Relaxed);
+        self.max_image_bytes.store(config.max_image_bytes, Ordering::Relaxed);
+        self.prune(&self.db());
+    }
+
+    fn max_image_bytes(&self) -> usize {
+        self.max_image_bytes.load(Ordering::Relaxed)
+    }
+
     fn prune(&self, db: &Db) {
-        match db.prune(self.max_items) {
+        match db.prune(self.max_items.load(Ordering::Relaxed)) {
             Ok(paths) => remove_files(&paths),
             Err(e) => eprintln!("history: prune failed: {e}"),
         }
@@ -90,8 +102,8 @@ impl History {
 
     /// Record an image given as PNG (or any format the `image` crate reads).
     pub fn add_image_encoded(&self, data: &[u8]) -> Result<bool, String> {
-        if data.len() > self.max_image_bytes {
-            return Err(format!("image is {} bytes, limit is {}", data.len(), self.max_image_bytes));
+        if data.len() > self.max_image_bytes() {
+            return Err(format!("image is {} bytes, limit is {}", data.len(), self.max_image_bytes()));
         }
         let img = image::load_from_memory(data).map_err(|e| e.to_string())?.to_rgba8();
         let is_png = data.starts_with(b"\x89PNG");
@@ -117,8 +129,8 @@ impl History {
                 &encoded
             }
         };
-        if png.len() > self.max_image_bytes {
-            return Err(format!("image is {} bytes, limit is {}", png.len(), self.max_image_bytes));
+        if png.len() > self.max_image_bytes() {
+            return Err(format!("image is {} bytes, limit is {}", png.len(), self.max_image_bytes()));
         }
         let path = self.images_dir.join(format!("{hash}.png"));
         std::fs::write(&path, png).map_err(|e| e.to_string())?;
@@ -230,5 +242,16 @@ mod tests {
         assert!(h.add_image_encoded(b"nope").is_err());
         assert!(h.add_image_rgba(2, 2, vec![0; 3]).is_err());
         assert!(!h.add_text("").unwrap());
+    }
+
+    #[test]
+    fn lowering_max_items_prunes_immediately() {
+        let dir = tempfile::tempdir().unwrap();
+        let h = history(dir.path(), 10);
+        for t in ["a", "b", "c"] {
+            h.add_text(t).unwrap();
+        }
+        h.set_limits(&Config { max_items: 1, ..Config::default() });
+        assert_eq!(h.list("", 10).unwrap().len(), 1);
     }
 }

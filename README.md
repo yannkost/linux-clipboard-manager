@@ -22,11 +22,14 @@ Run `src-tauri/target/release/linux-clipboard-manager`. On first start it:
 
 ## Configuration
 
+Open *Settings…* from the tray menu, the ⚙ button in the popup, or <kbd>Ctrl</kbd>+<kbd>,</kbd>.
+Settings are saved to `config.toml`:
+
 ```toml
 hotkey = "<Control>i"          # GTK accelerator syntax
 max_items = 500                # unpinned entries kept
 max_image_bytes = 20971520     # larger images are skipped
-paste_after_select = true      # paste into the previous window (needs the GNOME helper)
+paste_after_select = false     # paste into the previous window (needs the GNOME helper)
 autostart = true
 poll_fallback = true           # poll the clipboard when the GNOME helper is missing
 ```
@@ -35,11 +38,14 @@ poll_fallback = true           # poll the clipboard when the GNOME helper is mis
 
 Wayland does not let normal apps grab global shortcuts. Until the GNOME Shell
 helper extension exists, bind a custom shortcut in
-*Settings → Keyboard → Custom Shortcuts* to:
+*Settings → Keyboard → Custom Shortcuts* to the binary's full path plus
+`--toggle`, for example:
 
 ```
-linux-clipboard-manager --toggle
+/home/you/linux-clipboard-manager/src-tauri/target/release/linux-clipboard-manager --toggle
 ```
+
+GNOME does not expand `~` in shortcut commands, so use an absolute path.
 
 A second launch toggles the popup of the running instance.
 

@@ -27,7 +27,7 @@ impl Default for Config {
             hotkey: "<Control>i".into(),
             max_items: 500,
             max_image_bytes: 20 * 1024 * 1024,
-            paste_after_select: true,
+            paste_after_select: false,
             autostart: true,
             poll_fallback: true,
         }
@@ -55,6 +55,20 @@ impl Config {
                 Config::default()
             }
         }
+    }
+
+    /// Reject values that would break the app.
+    pub fn validate(&self) -> Result<(), String> {
+        if !(1..=100_000).contains(&self.max_items) {
+            return Err("Maximum entries must be between 1 and 100000.".into());
+        }
+        if self.max_image_bytes < 1024 * 1024 {
+            return Err("Maximum image size must be at least 1 MB.".into());
+        }
+        if self.hotkey.trim().is_empty() {
+            return Err("The shortcut cannot be empty.".into());
+        }
+        Ok(())
     }
 
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
