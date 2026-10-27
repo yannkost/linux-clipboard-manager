@@ -22,12 +22,13 @@
   }
 }
 * { box-sizing: border-box; }
-/* The window itself is transparent; the body is the visible card, inset so
-   its shadow has room to show. */
-html { height: 100%; background: transparent; }
-body {
-  height: calc(100% - 32px);
-  margin: 16px;
+/* The window itself is transparent and #card is the visible popup, inset so
+   its shadow has room to show. The background must not sit on <body>: with
+   none on <html>, the browser would paint it across the whole window. */
+html, body { height: 100%; margin: 0; background: transparent; }
+body { padding: 16px; }
+#card {
+  height: 100%;
   border-radius: 10px;
   box-shadow: var(--shadow);
   display: flex;
