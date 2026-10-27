@@ -13,13 +13,14 @@
       {
         "label": "popup",
         "title": "Clipboard",
-        "width": 560,
-        "height": 640,
+        "width": 592,
+        "height": 672,
         "resizable": false,
         "decorations": false,
         "visible": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
+        "transparent": true,
         "center": true
       }
     ],
