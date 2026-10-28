@@ -67,10 +67,25 @@ pub fn find_binding() -> Option<(String, String)> {
     })
 }
 
+fn toggle_command() -> Result<String, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    Ok(format!("{} --toggle", exe.display()))
+}
+
+/// Make our shortcut run this binary, e.g. after moving from a dev build to
+/// an installed one.
+pub fn refresh_binding_command() -> Result<(), String> {
+    let Some((path, _)) = find_binding() else { return Ok(()) };
+    let command = toggle_command()?;
+    if custom_get(&path, "command").as_deref() != Some(command.as_str()) {
+        gsettings(&["set", &format!("{CUSTOM_SCHEMA}:{path}"), "command", &quote(&command)])?;
+    }
+    Ok(())
+}
+
 /// Point our custom shortcut at `accel` (empty disables it), creating it if needed.
 pub fn set_binding(accel: &str) -> Result<(), String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let command = format!("{} --toggle", exe.display());
+    let command = toggle_command()?;
     let path = match find_binding() {
         Some((path, _)) => path,
         None => {

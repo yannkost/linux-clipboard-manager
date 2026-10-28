@@ -17,7 +17,14 @@ cargo build --release
 cargo test
 ```
 
-Run `src-tauri/target/release/linux-clipboard-manager`. On first start it:
+To install it for your user (release build in `~/.local/bin`, a "Clips" menu
+entry and icons), then restart it from there:
+
+```bash
+scripts/install.sh
+```
+
+On first start it:
 
 - writes `~/.config/linux-clipboard-manager/config.toml` with defaults,
 - stores history in `~/.local/share/linux-clipboard-manager/` (`history.db` plus `images/*.png`),

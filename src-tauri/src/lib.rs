@@ -241,6 +241,9 @@ fn sync_shortcut(app: &AppHandle) {
         }
         None => {}
     }
+    if let Err(e) = gnome::refresh_binding_command() {
+        eprintln!("shortcut: could not update GNOME shortcut: {e}");
+    }
 }
 
 fn start_dbus(app: AppHandle) {
