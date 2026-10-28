@@ -136,6 +136,10 @@ cargo build    # debug build: target/debug/linux-clipboard-manager
 Edits in `ui/` are picked up by the next `cargo build`. Pushing a `v*` tag
 builds the .deb on GitHub Actions and attaches it to a release.
 
+## License
+
+Co-Pa is released under the [MIT License](LICENSE).
+
 ## Credits
 
 UI fonts: [Inter](https://rsms.me/inter/) and

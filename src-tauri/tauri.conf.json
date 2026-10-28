@@ -35,6 +35,8 @@
     "shortDescription": "Clipboard history manager",
     "longDescription": "A Ditto-style clipboard history manager for GNOME on Wayland: text and image history, search, pinning, preview and auto-paste.",
     "publisher": "Yann Kost",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Yann Kost",
     "homepage": "https://github.com/yannkost/linux-clipboard-manager",
     "linux": {
       "deb": {

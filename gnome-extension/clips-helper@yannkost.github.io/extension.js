@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Co-Pa helper: the parts of a clipboard manager that Wayland only allows
 // inside GNOME Shell.
 //
