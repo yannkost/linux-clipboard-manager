@@ -13,7 +13,7 @@ jobs:
     # Same base as Ubuntu 24.04 derivatives (Zorin OS 18, Mint 22, Pop!_OS 24.04).
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install build dependencies
         run: |
