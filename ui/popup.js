@@ -48,10 +48,12 @@ function renderRow(entry, index) {
   });
   row.append(el("div", { class: "row-bg" }));
 
-  const slot = el("div", { class: "badge-slot" });
-  if (multi) slot.append(el("div", { class: "check" }, icon("check")));
-  else if (index < 9) slot.append(el("div", { class: "badge" }, String(index + 1)));
-  row.append(slot);
+  // The check column only exists while several rows are selected.
+  if (state.multi.size) {
+    const slot = el("div", { class: "badge-slot" });
+    if (multi) slot.append(el("div", { class: "check" }, icon("check")));
+    row.append(slot);
+  }
 
   const content = el("div", { class: "content" });
   const text = entry.text || "";

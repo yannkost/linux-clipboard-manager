@@ -120,7 +120,7 @@ function shortcutPage() {
       el("div", { class: "boxed" }, rows),
       shortcut.mode === "recording" && el("div", { class: "group-note" }, "Press Esc to cancel or Backspace to remove the shortcut.")),
     group("GNOME extension", [
-      row(el("div", {}, el("span", {}, "Clips extension"), el("span", { class: "sub" }, extensionHint(status))), extensionControls(), "tall"),
+      row(el("div", {}, el("span", {}, "Co-Pa extension"), el("span", { class: "sub" }, extensionHint(status))), extensionControls(), "tall"),
     ]),
   ];
 }
@@ -196,7 +196,7 @@ function historyPage() {
     apps.push(el("button", { class: "row tight add-row", type: "button", onclick: () => { addingApp = true; render(); } }, icon("add"), "Add app…"));
   }
 
-  const needsExt = status.helper_active ? null : "Takes effect once the Clips GNOME extension is enabled.";
+  const needsExt = status.helper_active ? null : "Takes effect once the Co-Pa GNOME extension is enabled.";
   return [
     group("Storage", [
       row("Maximum items", stepper, "tight"),
@@ -218,7 +218,7 @@ function pastePage() {
   return [
     group("Pasting", [
       row(el("div", {}, el("span", {}, "Paste automatically after selecting"),
-        !status.helper_active && el("span", { class: "sub" }, "Needs the Clips GNOME extension; until then the entry is only copied.")),
+        !status.helper_active && el("span", { class: "sub" }, "Needs the Co-Pa GNOME extension; until then the entry is only copied.")),
         switchEl(settings.paste_after_select, (v) => save({ paste_after_select: v }), "Paste automatically")),
       row("Move pasted item to top", switchEl(settings.move_to_top, (v) => save({ move_to_top: v }), "Move pasted item to top")),
       row("Strip formatting by default", switchEl(settings.strip_formatting, (v) => save({ strip_formatting: v }), "Strip formatting by default")),
@@ -230,7 +230,7 @@ function aboutPage() {
   const link = (label, which) => el("button", { class: "row tight link-row", type: "button", onclick: () => invoke("open_link", { which }) },
     el("span", {}, label), icon("open_in_new"));
   return [
-    el("div", { class: "about-head" }, appIcon(96), el("div", { class: "about-name" }, "Clips"), el("div", { class: "about-version" }, `Version ${status.version}`)),
+    el("div", { class: "about-head" }, appIcon(96), el("div", { class: "about-name" }, "Co-Pa"), el("div", { class: "about-version" }, `Version ${status.version}`)),
     el("div", { class: "boxed" }, link("Website", "website"), link("Source code", "source"), link("Report an issue", "issues")),
   ];
 }

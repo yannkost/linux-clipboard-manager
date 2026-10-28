@@ -1,7 +1,7 @@
 {
   "uuid": "clips-helper@yannkost.github.io",
-  "name": "Clips helper",
-  "description": "Lets the Clips clipboard manager see clipboard changes and paste into other windows on Wayland.",
+  "name": "Co-Pa helper",
+  "description": "Lets the Co-Pa clipboard manager see clipboard changes and paste into other windows on Wayland.",
   "shell-version": ["45", "46", "47", "48"],
   "url": "https://github.com/yannkost/linux-clipboard-manager",
   "version": 1

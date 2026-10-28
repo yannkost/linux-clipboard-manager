@@ -122,13 +122,13 @@ pub fn open_settings(app: &AppHandle, page: Option<&str>, confirm_clear: bool) {
         return;
     }
     let url = format!("settings.html?page={page}&clear={confirm_clear}");
-    if let Err(e) = build_window(app, SETTINGS, url, "Clips Settings", 720.0, 560.0) {
+    if let Err(e) = build_window(app, SETTINGS, url, "Co-Pa Settings", 720.0, 560.0) {
         eprintln!("settings window: {e}");
     }
 }
 
 fn open_welcome(app: &AppHandle) {
-    if let Err(e) = build_window(app, WELCOME, "welcome.html".into(), "Welcome to Clips", 480.0, 520.0) {
+    if let Err(e) = build_window(app, WELCOME, "welcome.html".into(), "Welcome to Co-Pa", 480.0, 520.0) {
         eprintln!("welcome window: {e}");
     }
 }
@@ -268,6 +268,10 @@ fn start_dbus(app: AppHandle) {
 }
 
 pub fn apply_autostart(app: &AppHandle, enabled: bool) {
+    // Builds before the rename to Co-Pa wrote their autostart entry under the old name.
+    if let Some(old) = dirs::config_dir().map(|d| d.join("autostart/linux-clipboard-manager.desktop")) {
+        let _ = std::fs::remove_file(old);
+    }
     let autolaunch = app.autolaunch();
     let result = if enabled { autolaunch.enable() } else { autolaunch.disable() };
     if let Err(e) = result {

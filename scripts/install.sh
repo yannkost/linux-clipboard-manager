@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Clips in release mode and install it for the current user:
+# Build Co-Pa in release mode and install it for the current user:
 #   ~/.local/bin/linux-clipboard-manager, a menu entry and icons.
 # Then restart it, which also repoints the autostart entry and the GNOME
 # shortcut at the installed binary.
@@ -26,7 +26,7 @@ mkdir -p "$DATA_DIR/applications"
 cat > "$DATA_DIR/applications/$APP_ID.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
-Name=Clips
+Name=Co-Pa
 GenericName=Clipboard history
 Comment=Search and paste from your clipboard history
 Exec=$BIN --toggle
@@ -45,7 +45,7 @@ DESKTOP
 gtk-update-icon-cache -q -t "$DATA_DIR/icons/hicolor" 2>/dev/null || true
 update-desktop-database -q "$DATA_DIR/applications" 2>/dev/null || true
 
-# Restart whichever Clips is running (dev or installed) as the installed one.
+# Restart whichever Co-Pa is running (dev or installed) as the installed one.
 # The kernel truncates process names to 15 characters.
 pkill -x linux-clipboard 2>/dev/null || true
 sleep 1

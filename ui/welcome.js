@@ -14,7 +14,7 @@ function render() {
   $("ext-status").replaceChildren(extensionPill(status));
   $("ext-action").hidden = status.helper_active || status.extension_installed;
   $("ext-text").textContent = status.extension_installed && !status.helper_active
-    ? "Installed. Log out and back in once to start it; until then Clips works without auto-paste."
+    ? "Installed. Log out and back in once to start it; until then Co-Pa works without auto-paste."
     : "A small GNOME extension needs to be enabled for auto-paste and reliable clipboard capture to work.";
   $("login").replaceChildren(el("button", {
     class: "switch", type: "button", role: "switch", "aria-label": "Launch at login",

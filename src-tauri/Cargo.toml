@@ -7,7 +7,7 @@ license = "MIT"
 edition = "2021"
 
 [build-dependencies]
-tauri-build = "2.7.4"
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 arboard = { version = "3.7.0", features = ["wayland-data-control", "image-data"] }

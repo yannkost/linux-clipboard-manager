@@ -93,7 +93,7 @@ pub fn set_binding(accel: &str) -> Result<(), String> {
             paths.push(OUR_PATH.to_string());
             let list = format!("[{}]", paths.iter().map(|p| quote(p)).collect::<Vec<_>>().join(", "));
             gsettings(&["set", MEDIA_KEYS, "custom-keybindings", &list])?;
-            gsettings(&["set", &format!("{CUSTOM_SCHEMA}:{OUR_PATH}"), "name", &quote("Clips")])?;
+            gsettings(&["set", &format!("{CUSTOM_SCHEMA}:{OUR_PATH}"), "name", &quote("Co-Pa")])?;
             OUR_PATH.to_string()
         }
     };
@@ -203,7 +203,7 @@ fn write_extension_files() -> Result<bool, String> {
     Ok(changed)
 }
 
-/// Keep an installed extension in step with this build of Clips. GNOME Shell
+/// Keep an installed extension in step with this build of Co-Pa. GNOME Shell
 /// loads the new code at the next login.
 pub fn update_installed_extension() {
     if extension_installed() {

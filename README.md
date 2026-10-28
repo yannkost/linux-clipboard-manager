@@ -1,133 +1,144 @@
-# Clips (linux-clipboard-manager)
+# Co-Pa
 
-A Ditto-style clipboard history manager for Linux (GNOME, Wayland): text and
-image history, a searchable popup on <kbd>Ctrl</kbd>+<kbd>I</kbd>, pinned items,
-a preview panel, tray menu, autostart, and a libadwaita-style settings window.
+**Co-Pa** (short for *copy-paste*) is a clipboard history manager for Linux,
+inspired by [Ditto](https://ditto-cp.sourceforge.io/) on Windows. It remembers
+everything you copy, text and images, and brings it back with one shortcut.
 
-Built with Tauri 2 (Rust backend in `src-tauri/`, plain HTML/JS in `ui/`, no
-build step). The UI follows the "Clips Desktop" design; its colour tokens live
-in `ui/tokens.css`.
+It is built for **GNOME on Wayland** (Ubuntu, Zorin OS, Fedora Workstation, …),
+where most clipboard managers struggle because Wayland does not let normal apps
+watch the clipboard or type into other windows.
 
-## Build
+![Co-Pa popup](docs/popup-light.png)
+
+## Features
+
+- **Searchable history** of text and images, opened with <kbd>Ctrl</kbd>+<kbd>I</kbd> (configurable).
+- **Auto-paste**: pick an entry and it is pasted straight into the window you were working in.
+- **Pinned items** that never expire, in their own tab.
+- **Preview panel** with the full text (line numbers) or the full image, plus Copy / Save as… / Open.
+- **Smart rows**: links (with an open button), file paths, colours with a swatch, code and images are recognised.
+- **Multi-select** to paste or delete several entries at once.
+- **Privacy**: skips passwords copied from password managers, and copies from apps you exclude.
+- **Limits**: maximum number of entries, maximum image size, and optional expiry after 1, 7 or 30 days.
+- **Tray icon** with pause recording, **autostart** at login, light and dark themes.
+
+![Preview panel in dark mode](docs/popup-dark-preview.png)
+
+## Install
+
+### From the .deb (Ubuntu 24.04+, Zorin OS 18, Debian-based)
+
+Download `Co-Pa_<version>_amd64.deb` from the
+[latest release](https://github.com/yannkost/linux-clipboard-manager/releases/latest), then:
 
 ```bash
-sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev build-essential pkg-config libxdo-dev
-cd src-tauri
-cargo build --release
-cargo test
+sudo apt install ./Co-Pa_*_amd64.deb
 ```
 
-To install it for your user (release build in `~/.local/bin`, a "Clips" menu
-entry and icons), then restart it from there:
+Start **Co-Pa** from the app menu once. It then:
+
+1. starts automatically at every login (hidden in the tray),
+2. creates the GNOME keyboard shortcut <kbd>Ctrl</kbd>+<kbd>I</kbd>,
+3. shows a welcome dialog with an **Enable extension** button. Click it, then
+   **log out and back in once** (GNOME only loads new extensions at login).
+
+After that, auto-paste works (turn it on in Settings → Paste behaviour).
+Without the extension Co-Pa still records your history and puts the chosen
+entry on the clipboard; you then paste with <kbd>Ctrl</kbd>+<kbd>V</kbd> yourself.
+
+### From source
 
 ```bash
+# Build dependencies (Debian/Ubuntu package names)
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev
+# Rust, if you don't have it: https://rustup.rs
+git clone https://github.com/yannkost/linux-clipboard-manager.git
+cd linux-clipboard-manager
 scripts/install.sh
 ```
 
-On first start it:
+`scripts/install.sh` builds a release binary, installs it to
+`~/.local/bin/linux-clipboard-manager` with a menu entry and icons, and
+(re)starts it. Run it again to update.
 
-- writes `~/.config/linux-clipboard-manager/config.toml` with defaults,
-- stores history in `~/.local/share/linux-clipboard-manager/` (`history.db` plus `images/*.png`),
-- adds an XDG autostart entry (`~/.config/autostart/`) that starts it hidden with `--hidden`,
-- creates (or adopts) a GNOME custom keyboard shortcut that runs `linux-clipboard-manager --toggle`,
-- shows a one-time welcome dialog.
+To build the .deb yourself: `cargo install tauri-cli --version "^2" --locked`,
+then `cd src-tauri && cargo tauri build --bundles deb`.
 
-Command-line flags for a second launch: `--toggle` shows/hides the popup,
-`--settings` opens the settings window.
-
-## Configuration
-
-Open *Settings* from the tray menu or with <kbd>Ctrl</kbd>+<kbd>,</kbd> in the
-popup. Changes apply immediately and are saved to `config.toml`:
-
-| Key | Default | |
-|---|---|---|
-| `hotkey` | `"<Control>i"` | GTK accelerator; empty disables it. Kept in sync with the GNOME custom shortcut |
-| `max_items` | `500` | unpinned entries kept |
-| `max_image_bytes` | `20971520` | larger images are skipped |
-| `retention_days` | `0` | delete unpinned entries unused for this long (0 = forever, or 1/7/30) |
-| `paste_after_select` | `false` | paste into the previous window (needs the GNOME helper) |
-| `move_to_top` | `true` | a pasted entry moves to the top of Recent |
-| `strip_formatting` | `false` | swap Enter and Shift+Enter |
-| `autostart` | `true` | |
-| `show_tray` | `true` | |
-| `theme` | `"system"` | `system`, `light` or `dark` |
-| `ignore_passwords` | `true` | needs the GNOME helper |
-| `excluded_apps` | `[]` | needs the GNOME helper |
-| `poll_fallback` | `true` | poll the clipboard when the GNOME helper is missing |
-
-## The popup
-
-Wayland does not let normal apps grab global shortcuts, so the app registers a
-GNOME custom shortcut (*Settings → Keyboard → Custom Shortcuts*) that runs the
-binary with `--toggle`. Change it from Clips' own Settings → Shortcut page,
-which also warns when GNOME already uses the combination.
+## Using it
 
 | Key | Action |
 |---|---|
-| type | filter |
+| <kbd>Ctrl</kbd>+<kbd>I</kbd> | open / close the popup |
+| type | search |
 | <kbd>↑</kbd> <kbd>↓</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd> | move |
-| <kbd>Enter</kbd> / click | paste (<kbd>Shift</kbd>+click: as plain text) |
-| <kbd>Shift</kbd>+<kbd>Enter</kbd> | paste as plain text |
-| <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | paste that row of the open tab |
+| <kbd>Enter</kbd> or click | paste |
+| <kbd>Shift</kbd>+<kbd>Enter</kbd> or <kbd>Shift</kbd>+click | paste as plain text |
+| <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | paste that row |
 | <kbd>Tab</kbd> | switch Recent / Pinned |
-| <kbd>Ctrl</kbd>+<kbd>P</kbd> | pin / unpin |
+| <kbd>Ctrl</kbd>+<kbd>P</kbd> or the pin button | pin / unpin |
 | <kbd>Del</kbd> | remove |
-| <kbd>Space</kbd> or <kbd>→</kbd> / <kbd>←</kbd> | open / close the preview |
+| <kbd>Space</kbd>, <kbd>→</kbd> / <kbd>←</kbd> | open / close the preview |
 | <kbd>Ctrl</kbd>+click, <kbd>Shift</kbd>+<kbd>↑</kbd><kbd>↓</kbd> | multi-select (Enter pastes all, Del removes all) |
 | <kbd>Ctrl</kbd>+<kbd>,</kbd> | settings |
 | <kbd>Esc</kbd> | close preview, clear selection, clear search, then close |
 
-Entries are shown as links, file paths, colours, code, text or images,
-detected from their content.
+Settings are in the tray menu (or <kbd>Ctrl</kbd>+<kbd>,</kbd>) and apply immediately.
 
-## D-Bus interface
+![Settings](docs/settings.png)
 
-The app owns `io.github.yannkost.ClipboardManager` on the session bus at
-`/io/github/yannkost/ClipboardManager`:
+## How it works, and why
 
-| Member | Signature | |
+| Part | What | Why |
 |---|---|---|
-| `Toggle()` | | show/hide the popup |
-| `AddText(s)` | | record text |
-| `AddImage(ay)` | | record a PNG image |
-| `Hotkey` | property `s` | configured shortcut |
+| App | [Tauri 2](https://tauri.app/): Rust backend (`src-tauri/`), plain HTML/CSS/JS UI (`ui/`, no build step) | Small native binary using the system's WebKitGTK; Rust for the clipboard, storage and D-Bus work. |
+| Storage | SQLite via `rusqlite`, images as PNG files next to it | Fast search and de-duplication (SHA-256), everything stays local. |
+| Settings | TOML file | Human-readable; the Settings window edits it for you. |
+| Shortcut | A GNOME custom shortcut running `linux-clipboard-manager --toggle` | Wayland apps cannot grab global keys, GNOME can. Changing the shortcut in Co-Pa updates it and warns about conflicts. |
+| GNOME extension | `gnome-extension/clips-helper@yannkost.github.io`, bundled inside the app | On Wayland only GNOME Shell may see every clipboard change and type into other windows. The extension reports copies (with the source app and password marker) and performs the paste. |
+| Fallback | Polling the clipboard every 500 ms with [`arboard`](https://github.com/1Password/arboard) through XWayland | Keeps history working before the extension is enabled. |
+| Messaging | D-Bus via `zbus` | The desktop's standard local messaging; no network ports. |
+| Tray, autostart, single instance | Tauri tray (AppIndicator), `tauri-plugin-autostart`, `tauri-plugin-single-instance` | A second launch (shortcut, menu) talks to the running instance instead of starting another one. |
 
-The GNOME helper extension also calls `AddTextFrom(s text, s app_name, s app_id, b password)`
-and `AddImageFrom(ay image, s app_name, s app_id)`, so Clips can skip
-passwords and excluded apps.
+### D-Bus interface
 
-## GNOME helper extension
+Co-Pa owns `io.github.yannkost.ClipboardManager` at `/io/github/yannkost/ClipboardManager`:
 
-`gnome-extension/clips-helper@yannkost.github.io` runs inside GNOME Shell,
-where Wayland allows what a normal app cannot:
+| Member | |
+|---|---|
+| `Toggle()` | show / hide the popup |
+| `AddText(s)`, `AddImage(ay png)` | record content |
+| `AddTextFrom(s text, s app_name, s app_id, b password)`, `AddImageFrom(ay image, s app_name, s app_id)` | used by the extension; honours the privacy settings |
+| `Hotkey` (property) | configured shortcut |
 
-- reports every clipboard change to Clips (with the source app and the
-  `x-kde-passwordManagerHint` password marker), replacing the 500 ms polling;
-- exports `io.github.yannkost.ClipboardManager.Shell` on GNOME Shell's bus
-  connection (`/io/github/yannkost/ClipboardManager/Shell`): `SetText(s)`,
-  `SetImage(ay)`, `Paste(b plain)`, `Version() → u`. `Paste` refocuses the
-  window that was active before the popup and sends <kbd>Ctrl</kbd>+<kbd>V</kbd>
-  (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> in terminals) through a virtual keyboard.
+The extension exports `io.github.yannkost.ClipboardManager.Shell` on GNOME
+Shell's connection at `/io/github/yannkost/ClipboardManager/Shell`:
+`SetText(s)`, `SetImage(ay)`, `Paste(b plain)` (refocuses the previous window
+and sends <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>
+in terminals) and `Version()`.
 
-The extension is bundled in the Clips binary. *Install* in Settings → Shortcut
-(or *Enable extension* in the welcome dialog) copies it to
-`~/.local/share/gnome-shell/extensions/` and adds it to GNOME's enabled
-extensions; on Wayland it starts after you log out and back in. Clips keeps
-the installed copy up to date on startup. To install by hand:
+### Files it writes
+
+- `~/.local/share/linux-clipboard-manager/`: history database and images
+- `~/.config/linux-clipboard-manager/config.toml`: settings
+- `~/.config/autostart/Co-Pa.desktop`: login autostart (toggle in Settings)
+- `~/.local/share/gnome-shell/extensions/clips-helper@yannkost.github.io/`: the extension, once enabled
+- a GNOME custom shortcut in *Settings → Keyboard → Custom Shortcuts*
+
+## Development
 
 ```bash
-cp -r gnome-extension/clips-helper@yannkost.github.io ~/.local/share/gnome-shell/extensions/
-gnome-extensions enable clips-helper@yannkost.github.io   # after logging out and in
+cd src-tauri
+cargo test     # database, config, shortcut parsing, …
+cargo build    # debug build: target/debug/linux-clipboard-manager
 ```
 
-Without the extension Clips falls back to polling the clipboard with arboard,
-and selecting an entry only puts it on the clipboard (you paste with
-<kbd>Ctrl</kbd>+<kbd>V</kbd> yourself).
+Edits in `ui/` are picked up by the next `cargo build`. Pushing a `v*` tag
+builds the .deb on GitHub Actions and attaches it to a release.
 
 ## Credits
 
-Bundled fonts: [Inter](https://rsms.me/inter/) and
+UI fonts: [Inter](https://rsms.me/inter/) and
 [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (SIL Open Font License),
 and a subset of [Material Symbols Rounded](https://fonts.google.com/icons)
 (Apache License 2.0).

@@ -1,11 +1,11 @@
-// Clips helper: the parts of a clipboard manager that Wayland only allows
+// Co-Pa helper: the parts of a clipboard manager that Wayland only allows
 // inside GNOME Shell.
 //
-// - Reports every clipboard change to the Clips app (AddTextFrom /
+// - Reports every clipboard change to the Co-Pa app (AddTextFrom /
 //   AddImageFrom on io.github.yannkost.ClipboardManager), with the app it was
 //   copied from and whether a password manager marked it as secret.
 // - Exports io.github.yannkost.ClipboardManager.Shell on GNOME Shell's bus
-//   connection so Clips can set the clipboard and paste into the window that
+//   connection so Co-Pa can set the clipboard and paste into the window that
 //   was focused before its popup opened.
 
 import Clutter from 'gi://Clutter';
@@ -44,7 +44,7 @@ const TERMINAL_RE = /terminal|kgx|ptyxis|console|kitty|alacritty|tilix|wezterm|k
 // Content we set ourselves shows up as a clipboard change; ignore it for this long.
 const OWN_CHANGE_MS = 1500;
 
-export default class ClipsHelperExtension extends Extension {
+export default class CoPaHelperExtension extends Extension {
     enable() {
         this._suppressUntil = 0;
         this._lastWindow = null;
@@ -69,12 +69,12 @@ export default class ClipsHelperExtension extends Extension {
 
         this._focusId = global.display.connect('notify::focus-window', () => {
             const win = global.display.focus_window;
-            if (win && !this._isClipsWindow(win))
+            if (win && !this._isCoPaWindow(win))
                 this._lastWindow = win;
         });
 
-        // Learn the Clips process id so its own windows are never paste
-        // targets and copies made inside Clips are not recorded again.
+        // Learn the Co-Pa process id so its own windows are never paste
+        // targets and copies made inside Co-Pa are not recorded again.
         this._watchId = Gio.bus_watch_name(Gio.BusType.SESSION, APP_BUS, Gio.BusNameWatcherFlags.NONE,
             (conn, _name, owner) => this._lookupPid(conn, owner),
             () => {
@@ -115,7 +115,7 @@ export default class ClipsHelperExtension extends Extension {
             });
     }
 
-    _isClipsWindow(win) {
+    _isCoPaWindow(win) {
         if (this._clipsPid && win.get_pid() === this._clipsPid)
             return true;
         return /linux-clipboard-manager/i.test(win.get_wm_class() ?? '');
@@ -127,7 +127,7 @@ export default class ClipsHelperExtension extends Extension {
         if (Date.now() < this._suppressUntil)
             return;
         const focus = global.display.focus_window;
-        if (focus && this._isClipsWindow(focus))
+        if (focus && this._isCoPaWindow(focus))
             return;
 
         const types = this._selection.get_mimetypes(Meta.SelectionType.SELECTION_CLIPBOARD);
@@ -160,18 +160,18 @@ export default class ClipsHelperExtension extends Extension {
     }
 
     _callApp(method, args) {
-        // NO_AUTO_START: if Clips is not running, the copy is simply not recorded.
+        // NO_AUTO_START: if Co-Pa is not running, the copy is simply not recorded.
         Gio.DBus.session.call(APP_BUS, APP_PATH, APP_IFACE, method, args, null,
             Gio.DBusCallFlags.NO_AUTO_START, 10000, null, (conn, res) => {
                 try {
                     conn.call_finish(res);
                 } catch (e) {
-                    // Clips not running, or it rejected the content (too big, excluded…).
+                    // Co-Pa not running, or it rejected the content (too big, excluded…).
                 }
             });
     }
 
-    // ---- methods called by Clips ----
+    // ---- methods called by Co-Pa ----
 
     _setText(text) {
         this._suppressUntil = Date.now() + OWN_CHANGE_MS;
@@ -184,7 +184,7 @@ export default class ClipsHelperExtension extends Extension {
     }
 
     _paste(_plain) {
-        // Clips puts plain text on the clipboard either way, so `plain` needs
+        // Co-Pa puts plain text on the clipboard either way, so `plain` needs
         // no special keystroke; terminals always need Shift.
         // A window that has since closed has no actor any more.
         const target = this._lastWindow?.get_compositor_private() ? this._lastWindow : null;
@@ -200,7 +200,7 @@ export default class ClipsHelperExtension extends Extension {
         this._pasteTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 30, () => {
             waited += 30;
             const focus = global.display.focus_window;
-            const ready = focus && !this._isClipsWindow(focus) && (!target || focus === target);
+            const ready = focus && !this._isCoPaWindow(focus) && (!target || focus === target);
             if (!ready && waited < 600)
                 return GLib.SOURCE_CONTINUE;
             if (ready && !settled) {
@@ -208,7 +208,7 @@ export default class ClipsHelperExtension extends Extension {
                 return GLib.SOURCE_CONTINUE;
             }
             this._pasteTimeoutId = 0;
-            if (focus && !this._isClipsWindow(focus))
+            if (focus && !this._isCoPaWindow(focus))
                 this._sendPasteKeys(TERMINAL_RE.test(focus.get_wm_class() ?? ''));
             return GLib.SOURCE_REMOVE;
         });

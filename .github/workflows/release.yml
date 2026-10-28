@@ -1,0 +1,37 @@
+# Build the .deb and publish it as a GitHub release when a v* tag is pushed.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  deb:
+    # Same base as Ubuntu 24.04 derivatives (Zorin OS 18, Mint 22, Pop!_OS 24.04).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev
+
+      - name: Test
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Build .deb
+        working-directory: src-tauri
+        run: npx --yes @tauri-apps/cli@2 build --bundles deb
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" src-tauri/target/release/bundle/deb/*.deb \
+            --title "Co-Pa ${GITHUB_REF_NAME#v}" --generate-notes

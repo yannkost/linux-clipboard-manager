@@ -80,7 +80,7 @@ fn on_menu_event(app: &AppHandle, event: MenuEvent) {
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon(app)?)
-        .tooltip("Clips")
+        .tooltip("Co-Pa")
         .menu(&menu(app)?)
         .show_menu_on_left_click(true)
         .on_menu_event(on_menu_event)
